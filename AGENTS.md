@@ -2,7 +2,7 @@
 
 Keep repository instructions generic and safe for open source.
 
-This repo is the Hermes3D frontend. It talks to the Hermes backend over the gateway WebSocket protocol and does not contain the backend itself.
+This repo is AgentCrew 3D, a derivative of the Hermes3D frontend with a local read-only coding-agent observer. It talks to the Hermes backend over the gateway WebSocket protocol and does not contain the backend itself.
 
 When the user asks for changes, they are asking for changes to this app. Apply solutions here, and treat the gateway protocol and the Hermes HTTP API as external contracts you read rather than edit.
 

@@ -1,3 +1,4 @@
+import type { OfficeAgent } from "@/features/retro-office/core/types";
 // Shared contracts for the 2D pixel office (Gather-style renderer).
 // Everything here is pure data — no Phaser or React imports — so the art,
 // map, and simulation modules stay unit-testable in jsdom/node.
@@ -119,6 +120,8 @@ export type PixelObjectKind =
   | "aquarium";
 
 export type PixelMapObject = {
+  /** Optional opening direction for observation lounge seating. */
+  facing?: PixelFacing;
   id: string;
   kind: PixelObjectKind;
   /** Tile coordinates of the object's top-left tile. */
@@ -282,6 +285,7 @@ export const OBJECT_FOOTPRINT: Readonly<Record<PixelObjectKind, [number, number]
 
 /** What a Hermes agent currently looks like to the pixel office. */
 export type PixelAgentInput = {
+  observation?: OfficeAgent["observation"];
   id: string;
   name: string;
   status: "working" | "idle" | "error";
@@ -309,6 +313,8 @@ export type PixelAgentInput = {
 };
 
 export type PixelAgentActivity =
+  | "drinking_tea"
+  | "playing_game"
   | "sitting_desk"
   | "walking"
   | "standing"

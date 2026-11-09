@@ -3,8 +3,8 @@ import { Bebas_Neue, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hermes3D",
-  description: "Focused operator studio for the Hermes gateway.",
+  title: "AgentCrew 3D",
+  description: "A read-only 3D office for your coding agents. Based on Hermes3D.",
 };
 
 const display = Bebas_Neue({

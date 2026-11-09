@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-office-*/
 /out/
 
 # production
@@ -93,3 +94,9 @@ screenshots-*/
 # Bytecode from the bundled Python plugin.
 __pycache__/
 *.pyc
+
+# Private observer state and hook backups
+/.hermes3d-observer/
+/.agentcrew-observer/
+*.observer-backup-*
+*.observer-tmp-*

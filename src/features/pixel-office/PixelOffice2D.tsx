@@ -10,12 +10,14 @@ import { Boxes, Settings2, UserPlus, X } from "lucide-react";
 import { SettingsPanel } from "@/features/office/components/panels/SettingsPanel";
 import type { OfficeRenderMode } from "@/features/office/renderMode";
 import type { OfficeAgent } from "@/features/retro-office/core/types";
+import type { PixelSimulation } from "./sim/agentSimulation";
 import type { OfficeAnimationState } from "@/lib/office/eventTriggers";
 import type { StudioGatewayAdapterType } from "@/lib/studio/settings";
 import {
   buildPixelAgentInputs,
   isCleaningActive,
 } from "@/features/pixel-office/buildPixelInputs";
+import { buildWorkspaceMap } from "./map/workspaceMap";
 import { buildHermesHqMap } from "@/features/pixel-office/map/hermesHqMap";
 import {
   createPixelSceneBridge,
@@ -29,6 +31,7 @@ type ContextMenuState = {
 };
 
 export type PixelOffice2DProps = {
+  observationMode?: boolean;
   agents: OfficeAgent[];
   animationState?: OfficeAnimationState | null;
   streamingTextByAgentId?: Record<string, string | null>;
@@ -81,6 +84,7 @@ export type PixelOffice2DProps = {
 export function PixelOffice2D(props: PixelOffice2DProps) {
   const {
     agents,
+    observationMode = false,
     animationState = null,
     streamingTextByAgentId = {},
     renderMode,
@@ -100,10 +104,12 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<import("phaser").Game | null>(null);
   const bridgeRef = useRef<PixelSceneBridge | null>(null);
+  const observationSimulationRef = useRef<PixelSimulation | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  const map = useMemo(() => buildHermesHqMap(), []);
+  const capacity = Math.max(8, Math.ceil(Math.max(0, ...agents.map(agent => (agent.observation?.seat ?? 0) + 1)) / 4) * 4);
+  const map = useMemo(() => observationMode ? buildWorkspaceMap(capacity) : buildHermesHqMap(), [observationMode, capacity]);
 
   if (!bridgeRef.current) {
     bridgeRef.current = createPixelSceneBridge({
@@ -166,11 +172,11 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
         "@/features/pixel-office/scene/PixelOfficeScene"
       );
       if (canceled || !rootRef.current) return;
-      const scene = createPixelOfficeScene({ PhaserLib, bridge, map });
+      const scene = createPixelOfficeScene({ PhaserLib, bridge, map, observationMode, simulationRef: observationMode ? observationSimulationRef : undefined });
       const game = new PhaserLib.Game({
         type: PhaserLib.AUTO,
         parent: rootRef.current,
-        backgroundColor: "#b5dc9c",
+        backgroundColor: observationMode ? "#101b22" : "#b5dc9c",
         scene: [scene],
         render: {
           antialias: false,
@@ -190,14 +196,14 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
-  }, [bridge, map]);
+  }, [bridge, map, observationMode]);
 
   const contextAgent = contextMenu
     ? (agents.find((agent) => agent.id === contextMenu.agentId) ?? null)
     : null;
 
   const workingCount = agents.filter((agent) => agent.status === "working").length;
-  const idleCount = agents.filter((agent) => agent.status === "idle").length;
+  const idleCount = agents.filter((agent) => agent.status === "idle" && !agent.observation?.uncertain).length;
   const errorCount = agents.filter((agent) => agent.status === "error").length;
 
   return (
@@ -247,7 +253,7 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
           }`}
           title={`Runtime: ${activeAdapterType} (${gatewayStatus})`}
         >
-          {activeAdapterType} • {gatewayStatus}
+          {observationMode ? "只读观察" : activeAdapterType} • {gatewayStatus}
         </div>
         <button
           onClick={() => onRenderModeChange("3d")}
@@ -257,7 +263,7 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
           <Boxes size={12} />
           <span>3D</span>
         </button>
-        <button
+        {!observationMode ? <button
           onClick={() => setSettingsOpen(true)}
           title="Studio settings"
           className={`flex h-7 w-7 items-center justify-center rounded-md border transition-all backdrop-blur-sm ${
@@ -267,13 +273,13 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
           }`}
         >
           <Settings2 size={12} />
-        </button>
+        </button> : null}
       </div>
 
       {/* Controls hint — bottom center (event console and chat own the corners). */}
       <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 pointer-events-none select-none">
         <div className="rounded-full bg-black/50 px-3 py-1 text-[10px] font-mono text-white/55 backdrop-blur-sm">
-          drag to pan · scroll to zoom · click an agent to chat
+          {observationMode ? "拖动平移 · 滚轮缩放 · 点击角色查看会话" : "drag to pan · scroll to zoom · click an agent to chat"}
         </div>
       </div>
 
@@ -302,7 +308,7 @@ export function PixelOffice2D(props: PixelOffice2DProps) {
                 onAgentChatSelect?.(contextMenu.agentId);
               }}
             >
-              Open chat
+              {observationMode ? "查看会话" : "Open chat"}
             </button>
             {onAgentEdit ? (
               <button

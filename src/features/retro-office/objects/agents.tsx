@@ -13,6 +13,7 @@ import type {
   RenderAgent,
 } from "@/features/retro-office/core/types";
 import { AgentModelProps } from "@/features/retro-office/objects/types";
+import {sampleLifePose} from '@/features/observer/officeLife';
 
 const MAX_NAMEPLATE_TEXT_LENGTH = 10;
 const MAX_SUBTITLE_TEXT_LENGTH = 20;
@@ -89,7 +90,11 @@ export const AgentModel = memo(function AgentModel({
   speechText = null,
   suppressSpeechBubble = false,
   huddleSeatIndex = null,
+  nameplateBaseHeight = 1.05,
+  observationMotion = true,
+  nameplateMode = 'standard',
 }: AgentModelProps) {
+  const headRef = useRef<THREE.Group>(null);
   const groupRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Group>(null);
   const rightArmRef = useRef<THREE.Group>(null);
@@ -107,6 +112,9 @@ export const AgentModel = memo(function AgentModel({
   const rightMouthCornerRef = useRef<THREE.Mesh>(null);
   const leftBrowRef = useRef<THREE.Mesh>(null);
   const rightBrowRef = useRef<THREE.Mesh>(null);
+  const teaCupRef = useRef<THREE.Group>(null);
+  const controllerRef = useRef<THREE.Group>(null);
+  const observationPlacedRef = useRef(false);
   const heldPaddleRef = useRef<THREE.Group>(null);
   const heldPaddleFaceRef = useRef<THREE.MeshStandardMaterial>(null);
   const heldCleaningToolRef = useRef<THREE.Group>(null);
@@ -127,11 +135,15 @@ export const AgentModel = memo(function AgentModel({
     const agent =
       agentLookupRef?.current?.get(agentId) ??
       agentsRef.current?.find((candidate) => candidate.id === agentId);
-    if (!agent || !groupRef.current) return;
+    if (!groupRef.current) return;
+    groupRef.current.visible=!!agent;
+    if (!agent) return;
 
     const [wx, , wz] = toWorld(agent.x, agent.y);
     pos.current.set(wx, 0, wz);
-    groupRef.current.position.lerp(pos.current, 0.15);
+    if ("observation" in agent && agent.observation && !observationPlacedRef.current) {
+      groupRef.current.position.copy(pos.current); observationPlacedRef.current = true;
+    } else groupRef.current.position.lerp(pos.current, 0.15);
 
     const targetY = agent.facing;
     let rotDelta = targetY - groupRef.current.rotation.y;
@@ -192,7 +204,7 @@ export const AgentModel = memo(function AgentModel({
       agent.state === "standing" || isWorkout || agent.pingPongUntil
         ? Math.sin(frameValue * 0.03) * 0.01
         : 0;
-    groupRef.current.position.y = bounce + breathe;
+    groupRef.current.position.y = bounce + breathe + (agent.observationSeatLift ?? 0);
 
     if (leftArmRef.current) {
       leftArmRef.current.rotation.x = 0;
@@ -352,7 +364,65 @@ export const AgentModel = memo(function AgentModel({
               : 0;
     }
 
-    const working =
+    // Observer-only activities: sitting at tea/game seats must not imply working.
+    const observation = "observation" in agent ? agent.observation : undefined;
+    const activity = agent.observationActivity;
+    const pose = sampleLifePose(agent, observationMotion);
+    const beat = pose.phase;
+    if (headRef.current) headRef.current.rotation.set(0,0,0);
+    if (observation && agent.state === "sitting") {
+      if (leftLegRef.current) leftLegRef.current.rotation.x = -1.25;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = -1.25;
+      if (leftArmRef.current) leftArmRef.current.rotation.x = activity === 'work' ? -1.05 : -.8;
+      if (rightArmRef.current) rightArmRef.current.rotation.x = activity === 'work' ? -1.05 : -.8;
+      groupRef.current.rotation.x = 0;
+    }
+    if (observation && !observation.uncertain && leftArmRef.current && rightArmRef.current && headRef.current) {
+      const left=leftArmRef.current,right=rightArmRef.current,head=headRef.current;
+      const weight=pose.amount;
+      if(pose.kind==='type'){
+        left.rotation.x=-1.05+Math.sin(beat*18)*.14*weight;
+        right.rotation.x=-1.05+Math.sin(beat*16+1)*.14*weight;
+        head.rotation.x=.06*weight;head.rotation.y=Math.sin(beat*.8)*.04*weight;
+      } else if(pose.kind==='focus'){
+        head.rotation.x=.22*weight;head.rotation.y=Math.sin(beat*1.2)*.14*weight;
+        groupRef.current.rotation.x=.07*weight;
+      } else if(pose.kind==='think'){
+        right.rotation.x=-1.05-.95*weight;right.rotation.z=-.28*weight;
+        head.rotation.z=.14*weight;head.rotation.y=.17*weight;
+      } else if(pose.kind==='stretch'){
+        left.rotation.x=right.rotation.x=-.8-1.8*weight;
+        left.rotation.z=.38*weight;right.rotation.z=-.38*weight;
+        head.rotation.x=-.2*weight;
+      } else if(pose.kind==='wave'){
+        right.rotation.x=-2.5*weight;right.rotation.z=(-.5+Math.sin(beat*13)*.3)*weight;
+        head.rotation.z=-.08*weight;
+      } else if(pose.kind==='sip'){
+        right.rotation.x=-.8-1.4*weight;head.rotation.x=-.08*weight;
+      } else if(pose.kind==='play'){
+        right.rotation.x=-1.1-Math.sin(beat*1.4)*.18;
+        left.rotation.x=-1;head.rotation.x=.13;head.rotation.y=Math.sin(beat*.6)*.15;
+      } else if(pose.kind==='relax'){
+        head.rotation.y=Math.sin(beat*.45)*.22*weight;
+        head.rotation.z=Math.sin(beat*.3)*.07*weight;
+        if(rightLegRef.current)rightLegRef.current.rotation.x+=Math.sin(beat*1.9)*.07*weight;
+      } else if(pose.kind==='attention'){
+        right.rotation.x=-2.2;right.rotation.z=-.22;
+        head.rotation.y=Math.sin(beat*.6)*.12;
+      } else if(pose.kind==='concern'){
+        head.rotation.x=.16;right.rotation.x=-1.9;
+      }
+    }
+    if (teaCupRef.current) {
+      teaCupRef.current.visible = activity === "tea" && (pose.kind==='sip'||pose.kind==='relax');
+      teaCupRef.current.rotation.x = -(rightArmRef.current?.rotation.x ?? 0);
+    }
+    if (controllerRef.current) {
+      controllerRef.current.visible = activity === "game" && pose.kind==='play';
+      controllerRef.current.rotation.z = observationMotion ? Math.sin(beat * 1.3) * .07 : 0;
+    }
+
+    const working = observation ? activity === "work" && !observation.uncertain :
       agent.state === "sitting" ||
       isWorkout ||
       isDancing ||
@@ -362,7 +432,7 @@ export const AgentModel = memo(function AgentModel({
 
     if (statusDotMatRef.current) {
       statusDotMatRef.current.color.set(
-        isError ? "#ef4444" : working ? "#22c55e" : "#f59e0b",
+        isError ? "#ef4444" : observation?.state === "waiting" ? "#f3c16a" : observation?.uncertain ? "#94a3b8" : working ? "#22c55e" : "#f59e0b",
       );
     }
 
@@ -456,7 +526,7 @@ export const AgentModel = memo(function AgentModel({
     }
 
     const showSmileCorners =
-      !isAway && !isError && !working && agent.state !== "walking";
+      !isAway && !isError && !working && observation?.state !== 'waiting' && observation?.state !== 'interrupted' && agent.state !== "walking";
     const showFrownCorners = isError;
     if (leftMouthCornerRef.current && rightMouthCornerRef.current) {
       leftMouthCornerRef.current.visible = showSmileCorners || showFrownCorners;
@@ -719,9 +789,11 @@ export const AgentModel = memo(function AgentModel({
       ? formatAgentSubtitleText(subtitle)
       : "";
   const nameplateHeight =
-    1.05 + (inHuddle ? ((huddleSeatIndex ?? 0) % 4) * 0.17 : 0);
+    nameplateBaseHeight + (inHuddle ? ((huddleSeatIndex ?? 0) % 4) * 0.17 : 0);
   const nameplateFontSize =
     nameplateText.length > 9 ? 0.118 : nameplateText.length > 7 ? 0.13 : 0.144;
+  const compactPlate=nameplateMode==='compact';
+  const plateWidth=compactPlate?.5:.82;
 
   return (
     <group
@@ -852,7 +924,17 @@ export const AgentModel = memo(function AgentModel({
           </mesh>
         </>
       ) : null}
+      <group ref={controllerRef} visible={false} position={[0, .30, .19]}>
+        {[-1,0,1].map(i=><mesh key={i} position={[i*.045,0,i*.008]} rotation={[0,0,i*.17]}>
+          <boxGeometry args={[.06,.10,.008]}/><meshStandardMaterial color={i===0?"#e0aa7d":"#f2e9cf"}/>
+        </mesh>)}
+      </group>
       <group ref={rightArmRef} position={[-0.12, 0.28, 0]}>
+        <group ref={teaCupRef} visible={false} position={[0,-.18,.015]}>
+          <mesh><cylinderGeometry args={[.045,.035,.08,12]} /><meshStandardMaterial color="#f4e6cb" /></mesh>
+          <mesh position={[0,.041,0]}><cylinderGeometry args={[.037,.037,.003,12]} /><meshStandardMaterial color="#845b32" /></mesh>
+          <mesh position={[.045,0,0]}><torusGeometry args={[.025,.008,6,12]} /><meshStandardMaterial color="#f4e6cb" /></mesh>
+        </group>
         <mesh position={[0, -0.08, 0]} castShadow>
           <boxGeometry args={[0.06, 0.16, 0.06]} />
           <meshStandardMaterial color={sleeveColor} roughness={0.75} />
@@ -971,6 +1053,7 @@ export const AgentModel = memo(function AgentModel({
           <meshStandardMaterial color={skin} roughness={0.55} />
         </mesh>
       </group>
+      <group ref={headRef} position={[0,.39,0]}><group position={[0,-.39,0]}>
       <mesh position={[0, 0.39, 0]}>
         <boxGeometry args={[0.07, 0.05, 0.07]} />
         <meshStandardMaterial color={skin} roughness={0.55} />
@@ -1151,6 +1234,7 @@ export const AgentModel = memo(function AgentModel({
         <boxGeometry args={[0.014, 0.014, 0.01]} />
         <meshBasicMaterial color="#9c4a4a" />
       </mesh>
+      </group></group>
       <mesh
         ref={pulseRingRef}
         position={[0, 0.005, 0]}
@@ -1169,24 +1253,24 @@ export const AgentModel = memo(function AgentModel({
       {!activeSpeechBubble && nameplateText ? (
         <Billboard position={[0, nameplateHeight, 0]}>
           <mesh position={[0, 0, -0.001]}>
-            <planeGeometry args={[0.82, subtitleText ? 0.34 : 0.24]} />
+            <planeGeometry args={[plateWidth, subtitleText ? 0.34 : 0.24]} />
             <meshBasicMaterial color="#080c14" transparent opacity={0.9} />
           </mesh>
-          <mesh position={[-0.392, 0, 0]}>
+          <mesh position={[-plateWidth/2+.018, 0, 0]}>
             <planeGeometry args={[0.028, subtitleText ? 0.34 : 0.24]} />
             <meshBasicMaterial color={color} />
           </mesh>
-          <mesh position={[0.355, subtitleText ? 0.05 : 0, 0]}>
-            <circleGeometry args={[0.052, 14]} />
+          <mesh position={[plateWidth/2-.055, subtitleText ? 0.05 : 0, 0]}>
+            <circleGeometry args={[compactPlate?.035:.052, 14]} />
             <meshBasicMaterial ref={statusDotMatRef} color="#ef4444" />
           </mesh>
           <Text
             position={[-0.02, subtitleText ? 0.05 : 0, 0.001]}
-            fontSize={nameplateFontSize}
+            fontSize={compactPlate?.105:nameplateFontSize}
             color="#e8dfc0"
             anchorX="center"
             anchorY="middle"
-            maxWidth={0.68}
+            maxWidth={compactPlate?.32:.68}
             font={undefined}
           >
             {nameplateText}

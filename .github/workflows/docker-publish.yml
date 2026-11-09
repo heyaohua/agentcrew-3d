@@ -1,19 +1,12 @@
 name: Docker Publish
 
-# Publishes only from main and version tags. Feature branches build the app
-# in regular CI; publishing per branch just spams the registry and marks
-# every PR red when the push fails.
+# Publishing containers is an explicit maintainer action, not a side effect of source pushes.
 on:
-  push:
-    branches:
-      - "main"
-    tags:
-      - "v*"
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hermes3d
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/agentcrew-3d
 
 jobs:
   publish:

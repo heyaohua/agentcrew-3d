@@ -1,5 +1,6 @@
 "use client";
 
+import { WORKSPACE_WIDTH, WORKSPACE_HEIGHT } from "../core/workspaceLayout";
 import { memo, useMemo, type ReactNode } from "react";
 import {
   CANVAS_H,
@@ -64,113 +65,6 @@ function FramedPicture({
         <meshStandardMaterial color={bgColor} roughness={0.95} metalness={0} />
       </mesh>
       <group position={[0, 0, artZ]}>{art}</group>
-    </group>
-  );
-}
-
-function UsaFlagArt() {
-  const flagWidth = 0.52;
-  const flagHeight = 0.3;
-  const stripeHeight = flagHeight / 13;
-  const cantonWidth = flagWidth * 0.4;
-  const cantonHeight = stripeHeight * 7;
-
-  return (
-    <>
-      {Array.from({ length: 13 }).map((_, index) => (
-        <mesh
-          key={`usa-stripe-${index}`}
-          position={[0, flagHeight / 2 - stripeHeight / 2 - index * stripeHeight, 0]}
-        >
-          <planeGeometry args={[flagWidth, stripeHeight]} />
-          <meshBasicMaterial
-            color={index % 2 === 0 ? "#b22234" : "#ffffff"}
-            side={2}
-          />
-        </mesh>
-      ))}
-      <mesh
-        position={[
-          -flagWidth / 2 + cantonWidth / 2,
-          flagHeight / 2 - cantonHeight / 2,
-          0.001,
-        ]}
-      >
-        <planeGeometry args={[cantonWidth, cantonHeight]} />
-        <meshBasicMaterial color="#3c3b6e" side={2} />
-      </mesh>
-      {Array.from({ length: 5 }).map((_, row) =>
-        Array.from({ length: 6 }).map((__, column) => (
-          <mesh
-            key={`usa-star-${row}-${column}`}
-            position={[
-              -flagWidth / 2 + 0.04 + column * 0.025,
-              flagHeight / 2 - 0.03 - row * 0.035,
-              0.002,
-            ]}
-          >
-            <circleGeometry args={[0.0045, 6]} />
-            <meshBasicMaterial color="#ffffff" side={2} />
-          </mesh>
-        )),
-      )}
-    </>
-  );
-}
-
-function BrazilFlagArt() {
-  return (
-    <>
-      <mesh position={[0, 0, 0]}>
-        <planeGeometry args={[0.52, 0.3]} />
-        <meshBasicMaterial color="#009b3a" side={2} />
-      </mesh>
-      <mesh position={[0, 0, 0.001]} rotation={[0, 0, Math.PI / 4]}>
-        <planeGeometry args={[0.25, 0.25]} />
-        <meshBasicMaterial color="#ffdf00" side={2} />
-      </mesh>
-      <mesh position={[0, 0, 0.002]}>
-        <circleGeometry args={[0.068, 28]} />
-        <meshBasicMaterial color="#002776" side={2} />
-      </mesh>
-      <mesh position={[0, 0.004, 0.003]} rotation={[0, 0, -0.22]}>
-        <planeGeometry args={[0.19, 0.026]} />
-        <meshBasicMaterial color="#ffffff" side={2} />
-      </mesh>
-    </>
-  );
-}
-
-function OfficeFlagPole({
-  position,
-  rotY = 0,
-  art,
-}: {
-  position: [number, number, number];
-  rotY?: number;
-  art: ReactNode;
-}) {
-  return (
-    <group position={position} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 0.08, 0]} receiveShadow>
-        <cylinderGeometry args={[0.22, 0.28, 0.16, 18]} />
-        <meshStandardMaterial color="#3a3229" roughness={0.94} metalness={0.08} />
-      </mesh>
-      <mesh position={[0, 1.32, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.024, 0.03, 2.48, 14]} />
-        <meshStandardMaterial color="#c4c9d1" roughness={0.32} metalness={0.88} />
-      </mesh>
-      <mesh position={[0, 2.6, 0]}>
-        <sphereGeometry args={[0.06, 16, 16]} />
-        <meshStandardMaterial color="#d4af37" roughness={0.28} metalness={0.92} />
-      </mesh>
-      <mesh position={[0.3, 2.34, 0]}>
-        <cylinderGeometry args={[0.012, 0.012, 0.62, 10]} />
-        <meshStandardMaterial color="#c4c9d1" roughness={0.32} metalness={0.88} />
-      </mesh>
-      <group position={[0.42, 2.16, 0.02]} scale={[1.9, 1.9, 1.9]}>
-        {art}
-      </group>
     </group>
   );
 }
@@ -263,8 +157,10 @@ function PlanterFoliage({
 
 export const FloorAndWalls = memo(function FloorAndWalls({
   showRemoteOffice = true,
+  workspaceOnly = false,
 }: {
   showRemoteOffice?: boolean;
+  workspaceOnly?: boolean;
 }) {
   const districtWidth = CANVAS_W * SCALE;
   const districtHeight = CANVAS_H * SCALE;
@@ -317,6 +213,20 @@ export const FloorAndWalls = memo(function FloorAndWalls({
   const pathGrass = useMemo(() => withRepeat(getGrassTextures(), 14, 2), []);
   const pathConcrete = useMemo(() => withRepeat(getConcreteTextures(), 8, 1), []);
   const gymRubber = useMemo(() => withRepeat(getCarpetTextures(), 6, 4), []);
+
+  if (workspaceOnly) {
+    const width = WORKSPACE_WIDTH * SCALE;
+    const depth = WORKSPACE_HEIGHT * SCALE;
+    const [cx, , cz] = toWorld(WORKSPACE_WIDTH / 2, WORKSPACE_HEIGHT / 2);
+    return <group>
+      <mesh position={[cx, -0.08, cz]} receiveShadow>
+        <boxGeometry args={[width, 0.16, depth]} />
+        <meshStandardMaterial map={woodFloor.map} roughness={0.9} color="#bba68b" />
+      </mesh>
+      <PerimeterWall center={[cx, cz - depth / 2]} length={width} axis="x" />
+      <PerimeterWall center={[cx - width / 2, cz]} length={depth} axis="z" />
+    </group>;
+  }
 
   return (
     <group>
@@ -778,11 +688,7 @@ export const FloorAndWalls = memo(function FloorAndWalls({
   );
 });
 
-export const WallPictures = memo(function WallPictures({
-  showRemoteOffice = true,
-}: {
-  showRemoteOffice?: boolean;
-}) {
+export const WallPictures = memo(function WallPictures() {
   const localWidth = LOCAL_OFFICE_CANVAS_WIDTH * SCALE;
   const localHeight = LOCAL_OFFICE_CANVAS_HEIGHT * SCALE;
   const [localCenterX, , localCenterZ] = toWorld(
@@ -794,36 +700,9 @@ export const WallPictures = memo(function WallPictures({
   const westX = localCenterX - localWidth / 2 + 0.07;
   const eastX = localCenterX + localWidth / 2 - 0.07;
   const pictureY = 0.64;
-  const [localFlagPoleX, , localFlagPoleZ] = toWorld(
-    180,
-    LOCAL_OFFICE_CANVAS_HEIGHT - 110,
-  );
-  const [remoteFlagPoleX, , remoteFlagPoleZ] = toWorld(
-    180,
-    REMOTE_OFFICE_ZONE.maxY - 110,
-  );
-  const localFlagPolePosition: [number, number, number] = [localFlagPoleX, 0, localFlagPoleZ];
-  const remoteFlagPolePosition: [number, number, number] = [
-    remoteFlagPoleX,
-    0,
-    remoteFlagPoleZ,
-  ];
 
   return (
     <group>
-      <OfficeFlagPole
-        position={localFlagPolePosition}
-        rotY={0.32}
-        art={<UsaFlagArt />}
-      />
-      {showRemoteOffice ? (
-        <OfficeFlagPole
-          position={remoteFlagPolePosition}
-          rotY={0.32}
-          art={<BrazilFlagArt />}
-        />
-      ) : null}
-
       <FramedPicture
         position={[localCenterX - 7.5, pictureY, northZ]}
         rotY={0}

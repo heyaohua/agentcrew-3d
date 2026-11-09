@@ -1,5 +1,6 @@
 "use client";
 
+import { buildWorkspaceFurniture, WORKSPACE_WIDTH, WORKSPACE_HEIGHT, WORKSPACE_ROAM_POINTS } from "./core/workspaceLayout";
 import {
   Pencil,
   Check,
@@ -908,6 +909,7 @@ function useAgentTick(
   standupMeeting: StandupMeeting | null = null,
   conversationGroups: ConversationGroup[] = [],
   conversationExpiryRef: React.RefObject<Map<string, number>> | null = null,
+  workspaceOnly = false,
 ) {
   const renderAgentsRef = useRef<RenderAgent[]>([]);
   const renderAgentLookupRef = useRef<Map<string, RenderAgent>>(new Map());
@@ -937,14 +939,16 @@ function useAgentTick(
     [getNavGrid],
   );
   const pickRoamPoint = useCallback((agentId: string) => {
+    if (workspaceOnly) return WORKSPACE_ROAM_POINTS[Math.floor(Math.random() * WORKSPACE_ROAM_POINTS.length)];
     if (isRemoteOfficeAgentId(agentId)) {
       return REMOTE_ROAM_POINTS[
         Math.floor(Math.random() * REMOTE_ROAM_POINTS.length)
       ];
     }
     return ROAM_POINTS[Math.floor(Math.random() * ROAM_POINTS.length)];
-  }, []);
+  }, [workspaceOnly]);
   const pickSpawnPoint = useCallback((agentId: string) => {
+    if (workspaceOnly) return WORKSPACE_ROAM_POINTS[Math.floor(Math.random() * WORKSPACE_ROAM_POINTS.length)];
     if (isRemoteOfficeAgentId(agentId)) {
       return REMOTE_ROAM_POINTS[
         Math.floor(Math.random() * REMOTE_ROAM_POINTS.length)
@@ -954,7 +958,7 @@ function useAgentTick(
       x: Math.random() * 800 + 100,
       y: Math.random() * 500 + 100,
     };
-  }, []);
+  }, [workspaceOnly]);
 
   const standupActive =
     standupMeeting?.phase === "gathering" ||
@@ -2550,6 +2554,7 @@ export function RetroOffice3D({
   officeCenterSignal = 0,
   animationState = null,
   readOnly = false,
+  observationMode = false,
   storageNamespace = "default",
   layoutPreset = "office",
   deskAssignmentByDeskUid = EMPTY_STRING_RECORD,
@@ -2666,6 +2671,7 @@ export function RetroOffice3D({
     | "jukeboxHoldByAgentId"
   > | null;
   readOnly?: boolean;
+  observationMode?: boolean;
   storageNamespace?: string;
   layoutPreset?: OfficeLayoutPreset;
   deskAssignmentByDeskUid?: Record<string, string>;
@@ -2810,7 +2816,7 @@ export function RetroOffice3D({
   );
 
   const [furniture, setFurniture] = useState<FurnitureItem[]>(() =>
-    buildInitialFurnitureLayout(storageNamespace, layoutPreset).filter(
+    observationMode ? buildWorkspaceFurniture() : buildInitialFurnitureLayout(storageNamespace, layoutPreset).filter(
       (item) => !isRetiredPingPongLamp(item),
     ),
   );
@@ -2872,7 +2878,7 @@ export function RetroOffice3D({
   // Sits below every state it resets so the setters exist when it runs.
   useEffect(() => {
     setFurniture(
-      buildInitialFurnitureLayout(storageNamespace, layoutPreset).filter(
+      observationMode ? buildWorkspaceFurniture() : buildInitialFurnitureLayout(storageNamespace, layoutPreset).filter(
         (item) => !isRetiredPingPongLamp(item),
       ),
     );
@@ -2882,7 +2888,7 @@ export function RetroOffice3D({
     setDrag({ kind: "idle" });
     setGhostPos(null);
     setWallDrawStart(null);
-  }, [layoutPreset, storageNamespace]);
+  }, [layoutPreset, storageNamespace, observationMode]);
   // New Idea 3: speech bubble agent IDs. Holds at most the one agent currently
   // granted the floor — see the speech-turn queue below.
   const [speechAgentIds, setSpeechAgentIds] = useState<Set<string>>(new Set());
@@ -3123,8 +3129,8 @@ export function RetroOffice3D({
   } | null>(null);
   const LOCAL_CAMERA_TARGET = useMemo(
     () =>
-      toWorld(LOCAL_OFFICE_CANVAS_WIDTH / 2, LOCAL_OFFICE_CANVAS_HEIGHT / 2),
-    [],
+      toWorld(observationMode ? WORKSPACE_WIDTH / 2 : LOCAL_OFFICE_CANVAS_WIDTH / 2, observationMode ? WORKSPACE_HEIGHT / 2 : LOCAL_OFFICE_CANVAS_HEIGHT / 2),
+    [observationMode],
   );
   const cameraTarget = remoteOfficeEnabled
     ? DISTRICT_CAMERA_TARGET
@@ -3300,13 +3306,17 @@ export function RetroOffice3D({
   const deskLocations = useMemo(() => getDeskLocations(furniture), [furniture]);
   const assignedDeskIndexByAgentId = useMemo(() => {
     const next: Record<string, number> = {};
+    if (observationMode) {
+      agents.slice(0, deskItems.length).forEach((agent, index) => { next[agent.id] = index; });
+      return next;
+    }
     deskItems.forEach((item, index) => {
       const agentId = deskAssignmentByDeskUid[item._uid];
       if (!agentId) return;
       next[agentId] = index;
     });
     return next;
-  }, [deskAssignmentByDeskUid, deskItems]);
+  }, [deskAssignmentByDeskUid, deskItems, observationMode, agents]);
   const janitorCleaningStops = useMemo(
     () => getJanitorCleaningStops(furniture),
     [furniture],
@@ -3396,6 +3406,7 @@ export function RetroOffice3D({
     standupMeeting,
     conversationGroups,
     conversationExpiryRef,
+    observationMode,
   );
   useEffect(() => {
     const syncRenderAgentUi = () => {
@@ -3492,10 +3503,10 @@ export function RetroOffice3D({
   );
   const handleAgentContextMenu = useCallback(
     (agentId: string, x: number, y: number) => {
-      if (isRemoteOfficeAgentId(agentId)) return;
+      if (observationMode || isRemoteOfficeAgentId(agentId)) return;
       setContextMenu({ id: agentId, x, y });
     },
-    [],
+    [observationMode],
   );
   const monitorImmersive = Boolean(activeMonitor && monitorImmersiveReady);
   const serverTerminal = useMemo(
@@ -3706,13 +3717,14 @@ export function RetroOffice3D({
   );
 
   useEffect(() => {
+    if (observationMode) return;
     const timeoutId = window.setTimeout(() => {
       saveFurniture(furniture, storageNamespace);
     }, 300);
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [furniture, storageNamespace]);
+  }, [furniture, storageNamespace, observationMode]);
 
   useEffect(() => {
     if (readOnly || storageNamespace !== "default") return;
@@ -5012,6 +5024,7 @@ export function RetroOffice3D({
   // E3 Idea 2: click a desk to send its assigned agent to walk and sit there.
   const handleDeskClick = useCallback(
     (uid: string) => {
+      if (observationMode) return;
       if (editMode) return;
       const item = furniture.find((f) => f._uid === uid);
       if (!item) return;
@@ -5221,6 +5234,7 @@ export function RetroOffice3D({
       setDeskAssignPickerOpen(false);
     },
     [
+      observationMode,
       closeManualSmsBoothView,
       closeManualPhoneBoothView,
       editMode,
@@ -5853,6 +5867,7 @@ export function RetroOffice3D({
             <SceneAtmosphere
               config={graphicsQualityConfig}
               remoteOfficeEnabled={remoteOfficeEnabled}
+              workspaceOnly={observationMode}
             />
 
             {/* Post-processing: AO, bloom, vignette, filmic tone mapping. */}
@@ -5863,10 +5878,10 @@ export function RetroOffice3D({
             />
 
             {/* Floor + walls — always visible, no async loading. */}
-            <SceneFloorAndWalls showRemoteOffice={remoteOfficeEnabled} />
+            <SceneFloorAndWalls showRemoteOffice={remoteOfficeEnabled} workspaceOnly={observationMode} />
 
             {/* Wall pictures — procedural, no async loading. */}
-            <SceneWallPictures showRemoteOffice={remoteOfficeEnabled} />
+            {!observationMode ? <SceneWallPictures /> : null}
 
             {/* Furniture models — each loads its GLB asynchronously. */}
             <Suspense fallback={null}>

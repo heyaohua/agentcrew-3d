@@ -17,7 +17,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const { MAX_VOICE_UPLOAD_BYTES, POST } = await import(
+const { MAX_VOICE_UPLOAD_BYTES } = await import('@/app/api/office/voice/transcribe/limits');
+const { POST } = await import(
   "@/app/api/office/voice/transcribe/route"
 );
 

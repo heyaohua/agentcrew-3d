@@ -12,6 +12,9 @@ import {
   spriteHeight,
   spriteWidth,
 } from "@/features/pixel-office/art";
+import { createObserverAgentDepth } from "./observerDepth";
+import { observerFurnitureFlip } from "./furnitureOrientation";
+import { observerScreenState } from "../sim/observerPresentation";
 import type { PixelSceneBridge } from "@/features/pixel-office/PixelSceneBridge";
 import {
   createPixelSimulation,
@@ -24,6 +27,7 @@ import {
   PIXEL_TILE_SIZE,
   type CharacterFrameName,
   type PixelAgentPose,
+  type PixelAgentInput,
   type PixelFacing,
   type PixelOfficeMap,
   type PixelSprite,
@@ -57,6 +61,7 @@ const AGENT_CLICK_RADIUS = 28;
 type AgentVisual = {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Image;
+  activityProps: Phaser.GameObjects.Graphics;
   shadow: Phaser.GameObjects.Ellipse;
   overlay: Phaser.GameObjects.Container;
   nameBg: Phaser.GameObjects.Graphics;
@@ -81,16 +86,21 @@ export const createPixelOfficeScene = (params: {
   PhaserLib: typeof import("phaser");
   bridge: PixelSceneBridge;
   map: PixelOfficeMap;
+  observationMode?: boolean;
+  simulationRef?: { current: PixelSimulation | null };
 }): Phaser.Scene => {
-  const { PhaserLib, bridge, map } = params;
+  const { PhaserLib, bridge, map, observationMode = false, simulationRef } = params;
   const worldWidth = map.cols * TILE;
   const worldHeight = map.rows * TILE;
+  const depthForAgent = createObserverAgentDepth(map, observationMode);
 
   class PixelOfficeScene extends PhaserLib.Scene {
     private sim: PixelSimulation | null = null;
     private visuals = new Map<string, AgentVisual>();
     private frameSetReady = new Set<string>();
     private animClock = 0;
+    private observerScreens = new Map<number, Phaser.GameObjects.Graphics>();
+    private gameBoards = new Map<string, Phaser.GameObjects.Graphics>();
     private dragStart: { x: number; y: number; sx: number; sy: number } | null = null;
     private dragDistance = 0;
 
@@ -99,7 +109,8 @@ export const createPixelOfficeScene = (params: {
     }
 
     create() {
-      this.sim = createPixelSimulation(map);
+      this.sim = createPixelSimulation(map, simulationRef?.current?.getState());
+      if (simulationRef) simulationRef.current = this.sim;
       this.registerSprites([...buildGroundTileSprites(), ...buildFurnitureSprites()]);
       this.renderGround();
       this.renderFurniture();
@@ -123,6 +134,7 @@ export const createPixelOfficeScene = (params: {
         cleaningActive: state.cleaningActive,
       });
       this.syncAgents(poses);
+      if (observationMode) this.updateObserverScreens(poses);
     }
 
     // -------------------------------------------------------------------
@@ -182,9 +194,35 @@ export const createPixelOfficeScene = (params: {
         const bottomY = (object.ty + fh) * TILE;
         const image = this.add.image(object.tx * TILE, bottomY, key);
         image.setOrigin(0, 1);
+        const flip = observerFurnitureFlip(object, observationMode);
+        image.setFlip(flip.flipX, flip.flipY);
         // Flat decor stays under everything that walks over it.
         const flat = object.kind === "rug" || object.kind === "flower";
         image.setDepth(flat ? 1 : bottomY);
+        if (observationMode && object.kind === "desk_monitor" && object.id.startsWith("desk-")) {
+          const screen = this.add.graphics({ x: object.tx * TILE + 17, y: bottomY - 57 });
+          screen.setDepth(bottomY + 0.1);
+          this.observerScreens.set(Number(object.id.slice(5)), screen);
+        }
+        if (observationMode && object.id === "shared-game-table") {
+          const board = this.add.graphics({ x: object.tx * TILE + 20, y: bottomY - 47 });
+          board.setDepth(bottomY + 0.1);
+          board.setScale(2);
+          this.gameBoards.set(object.id, board);
+        }
+        if (observationMode && object.id === "shared-tea-table") {
+          const tea = this.add.graphics({ x: object.tx * TILE, y: bottomY - 64 });
+          tea.setDepth(bottomY + 0.1);
+          // One communal tea service: tray, pot, and cups around the table.
+          tea.fillStyle(0xa16e46); tea.fillRoundedRect(29, 16, 39, 27, 3);
+          tea.fillStyle(0xe9e2ce); tea.fillEllipse(48, 29, 19, 14);
+          tea.fillRect(44, 19, 9, 3); tea.fillRect(60, 25, 7, 4);
+          tea.lineStyle(3, 0xe9e2ce); tea.strokeCircle(36, 28, 5);
+          for (const [x,y] of [[17,12],[73,12],[17,43],[73,43]]) {
+            tea.fillStyle(0xf8f0d9); tea.fillEllipse(x,y,10,7);
+            tea.fillStyle(0x7a5637); tea.fillEllipse(x,y-1,6,3);
+          }
+        }
         if (object.kind === "jukebox" || object.kind === "kanban_board") {
           const stationKind = object.kind === "jukebox" ? "jukebox" : "kanban";
           image.setInteractive({ useHandCursor: true });
@@ -196,6 +234,43 @@ export const createPixelOfficeScene = (params: {
             bridge.callbacks.onStationInteract?.(stationKind);
           });
         }
+      }
+    }
+
+    private updateObserverScreens(poses: PixelAgentPose[]) {
+      const inputs = bridge.getState().agents;
+      const bySeat = new Map(inputs.filter(input => input.observation).map(input => [input.observation!.seat, input]));
+      const poseById = new Map(poses.map(pose => [pose.id, pose]));
+      for (const [seat, screen] of this.observerScreens) {
+        const input = bySeat.get(seat);
+        const power = input ? observerScreenState(input, poseById.get(input.id)) : "off";
+        screen.clear();
+        screen.fillStyle(power === "working" ? 0x174b62 : power === "unknown" ? 0x2e3540 : 0x101620);
+        screen.fillRect(0, 0, 30, 15);
+        if (power === "working") {
+          screen.fillStyle(0x6df0c7);
+          for (let row = 0; row < 4; row++) screen.fillRect(3, 3 + row * 3, 8 + ((Math.floor(this.animClock / 220) + row * 3) % 14), 1);
+          screen.fillStyle(0xb5ebff, 0.22 + Math.sin(this.animClock / 450) * 0.07);
+          screen.fillRect(-2, -2, 34, 19);
+        } else if (power === "unknown") {
+          screen.fillStyle(0x7c8796); screen.fillRect(13, 6, 4, 2);
+        }
+      }
+      for (const board of this.gameBoards.values()) {
+        const active = inputs.some(input => !input.observation?.uncertain && poseById.get(input.id)?.activity === "playing_game");
+        board.clear();
+        // A physical wooden checkerboard: no display, glow or electronic cabinet.
+        board.fillStyle(0x8b6040); board.fillRect(-1, -1, 28, 16);
+        for (let row = 0; row < 3; row++) {
+          for (let col = 0; col < 6; col++) {
+            board.fillStyle((row + col) % 2 ? 0xb37c52 : 0xf0d5a4);
+            board.fillRect(col * 4 + 1, row * 4 + 1, 4, 4);
+          }
+        }
+        board.fillStyle(0x303238); board.fillCircle(3, 3, 1.6); board.fillCircle(11, 3, 1.6);
+        board.fillStyle(0xfff0d6); board.fillCircle(7, 11, 1.6); board.fillCircle(19, 11, 1.6);
+        const move = active ? Math.floor(this.animClock / 1200) % 4 : 0;
+        board.fillStyle(0x944a3d); board.fillCircle(7 + move * 4, 7, 1.6);
       }
     }
 
@@ -263,12 +338,12 @@ export const createPixelOfficeScene = (params: {
       // Gather-style default: start close enough that the pixel art reads at
       // 1:1+ detail, centered on the main pods. Wheel out for the overview.
       const zoom = PhaserLib.Math.Clamp(
-        Math.max(0.75, Math.floor(this.containZoom() * 4) / 4),
+        observationMode ? this.containZoom() : Math.max(0.75, Math.floor(this.containZoom() * 4) / 4),
         this.minZoom(),
         MAX_ZOOM,
       );
       camera.setZoom(zoom);
-      camera.centerOn(worldWidth / 2, worldHeight * 0.42);
+      camera.centerOn(worldWidth / 2, worldHeight * (observationMode ? 0.5 : 0.42));
     }
 
     private setupPointerControls() {
@@ -393,7 +468,8 @@ export const createPixelOfficeScene = (params: {
       sprite.setInteractive({ useHandCursor: true });
       sprite.on("pointerover", () => sprite.setTint(0xd9f1ff));
       sprite.on("pointerout", () => sprite.clearTint());
-      const container = this.add.container(0, 0, [shadow, sprite]);
+      const activityProps = this.add.graphics();
+      const container = this.add.container(0, 0, [shadow, sprite, activityProps]);
 
       const nameBg = this.add.graphics();
       const nameText = this.add.text(0, 0, name, {
@@ -448,6 +524,7 @@ export const createPixelOfficeScene = (params: {
       return {
         container,
         sprite,
+        activityProps,
         shadow,
         overlay,
         nameBg,
@@ -477,7 +554,7 @@ export const createPixelOfficeScene = (params: {
         if (step === 2) return `walk_${facing}_b` as CharacterFrameName;
         return `idle_${facing}` as CharacterFrameName;
       }
-      if (pose.activity === "sitting_desk" || pose.activity === "meeting") {
+      if (pose.activity === "sitting_desk" || pose.activity === "meeting" || pose.activity === "drinking_tea" || pose.activity === "playing_game") {
         return `sit_${facing}` as CharacterFrameName;
       }
       if (pose.activity === "station" && pose.stationId) {
@@ -492,22 +569,47 @@ export const createPixelOfficeScene = (params: {
     private updateVisual(
       visual: AgentVisual,
       pose: PixelAgentPose,
-      input: { name: string; status: string; thinking: boolean; awaitingApproval: boolean } | null,
+      input: PixelAgentInput | null,
       bubble: string,
     ) {
       visual.container.setPosition(pose.x, pose.y + TILE / 2 - 1);
-      visual.container.setDepth(pose.y + TILE / 2);
+      visual.container.setDepth(depthForAgent(pose));
       const frameKey = `char_${visual.seed}_${this.frameFor(pose)}`;
       if (this.textures.exists(frameKey) && visual.sprite.texture.key !== frameKey) {
         visual.sprite.setTexture(frameKey);
       }
 
+      visual.activityProps.clear();
+      if (input?.observation && !input.observation.uncertain && !pose.moving) {
+        const props = visual.activityProps;
+        if (pose.activity === "drinking_tea") {
+          // A visible hand lifts the cup to the mouth, then returns to the lap.
+          const lift = Math.max(0, Math.sin(this.animClock / 850)) * 12;
+          props.fillStyle(0xd6a582); props.fillRect(8, -30 - lift, 4, 10);
+          props.fillStyle(0xf2ead9); props.fillRect(5, -31 - lift, 10, 9);
+          props.lineStyle(2, 0xf2ead9); props.strokeRect(15, -29 - lift, 4, 5);
+          props.fillStyle(0x805c38); props.fillRect(6, -31 - lift, 8, 2);
+          props.fillStyle(0xf3e4d0, 0.6); props.fillRect(8, -36 - lift, 2, 3);
+        } else if (pose.activity === "playing_game") {
+          // Hands fan paper cards and place one card; no game controller.
+          const deal = Math.max(0, Math.sin(this.animClock / 750)) * 5;
+          props.fillStyle(0xd6a582); props.fillRect(-12, -31, 6, 5); props.fillRect(7 + deal, -34 - deal, 6, 5);
+          props.fillStyle(0xf7edd7); props.fillRect(-10, -37, 5, 10); props.fillRect(-6, -38, 5, 11); props.fillRect(-2, -36, 5, 9);
+          props.fillStyle(0xa63a3d); props.fillRect(-9, -35, 2, 3); props.fillRect(-1, -34, 2, 2);
+          props.fillStyle(0x303238); props.fillRect(-5, -36, 2, 3);
+          props.fillStyle(0xf7edd7); props.fillRect(8 + deal, -39 - deal, 5, 8);
+          props.fillStyle(0xa63a3d); props.fillRect(9 + deal, -37 - deal, 2, 2);
+        } else if (pose.activity === "sitting_desk") {
+          const press = Math.sin(this.animClock / 90) * 2;
+          props.fillStyle(0xd6a582); props.fillRect(-12, -33 + press, 6, 4); props.fillRect(7, -33 - press, 6, 4);
+        }
+      }
       const overlayY = pose.y + TILE / 2 - CHARACTER_HEIGHT - 8;
       visual.overlay.setPosition(pose.x, overlayY);
 
       // Nameplate pill with the status dot.
       const name = input?.name ?? "Janitor";
-      const status = input?.status ?? "idle";
+      const status = input?.observation?.uncertain ? "unknown" : input?.status ?? "idle";
       if (name !== visual.lastName || status !== visual.lastStatus) {
         visual.lastName = name;
         visual.lastStatus = status;
@@ -568,8 +670,14 @@ export const createPixelOfficeScene = (params: {
 
       // Approval badge.
       const approval = Boolean(input?.awaitingApproval);
-      visual.badgeText.setVisible(approval);
-      if (approval) {
+      const uncertain = Boolean(input?.observation?.uncertain);
+      const error = input?.observation?.state === "error";
+      const queued = observationMode && Boolean(pose.stationId?.startsWith("rest-queue-"));
+      visual.badgeText.setVisible(approval || uncertain || error || queued);
+      if (approval || uncertain || error || queued) {
+        visual.badgeText.setText(!observationMode ? "!" : approval ? "等待确认" : error ? "错误" : uncertain ? "状态待更新" : "休息区候座");
+        visual.badgeText.setFontSize(observationMode ? 10 : 16);
+        visual.badgeText.setBackgroundColor(approval ? "#fbbf24" : error ? "#ef4444" : "#667484");
         visual.badgeText.setPosition(-22, -14);
         visual.badgeText.setAlpha(0.75 + 0.25 * Math.sin(this.animClock / 250));
       }

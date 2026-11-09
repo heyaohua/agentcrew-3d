@@ -61,6 +61,8 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  // Build and verify a candidate without replacing assets used by a live observer.
+  distDir: process.env.HERMES_DIST_DIR || '.next',
   turbopack: {
     root: path.resolve(__dirname),
   },

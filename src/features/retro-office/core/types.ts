@@ -1,7 +1,16 @@
 import type { AgentAvatarProfile } from "@/lib/avatars/profile";
 import type { OfficeInteractionTargetId } from "@/lib/office/places";
 
+export type ObservationState = {
+  state: "ready" | "working" | "waiting" | "ended" | "interrupted" | "error" | "closed";
+  uncertain: boolean;
+  seat: number;
+  /** Visual exit only; does not retain this session in live counts/history. */
+  departing?: boolean;
+};
+
 export type OfficeAgent = {
+  observation?: ObservationState;
   id: string;
   name: string;
   subtitle?: string | null;
@@ -29,6 +38,10 @@ export type JanitorActor = {
 export type SceneActor = OfficeAgent | JanitorActor;
 
 export type RenderAgent = SceneActor & {
+  observationGesture?: {kind:'wave'|'stretch';startedFrame:number;untilFrame:number};
+  observationPace?: number;
+  observationSeatLift?: number;
+  observationActivity?: "work" | "tea" | "game" | "travel" | "unknown";
   x: number;
   y: number;
   targetX: number;

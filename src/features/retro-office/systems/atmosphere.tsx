@@ -205,9 +205,11 @@ function DustMotes({
 export function SceneAtmosphere({
   config,
   remoteOfficeEnabled = true,
+  workspaceOnly = false,
 }: {
   config: GraphicsQualityConfig;
   remoteOfficeEnabled?: boolean;
+  workspaceOnly?: boolean;
 }) {
   const sunRef = useRef<THREE.DirectionalLight | null>(null);
   const apronConcrete = useMemo(
@@ -260,7 +262,7 @@ export function SceneAtmosphere({
       <Suspense fallback={null}>
         <Environment
           files={OFFICE_ENVIRONMENT_HDR}
-          background
+          background={!workspaceOnly}
           backgroundBlurriness={0.04}
           backgroundIntensity={1}
           environmentIntensity={0.55}
@@ -294,6 +296,7 @@ export function SceneAtmosphere({
       {/* Cool sky fill from the opposite side — lifts shadowed faces. */}
       <directionalLight position={[-14, 12, -10]} intensity={0.55} color="#a7c4ef" />
 
+      {workspaceOnly ? <color attach="background" args={["#101b22"]} /> : <>
       {/* Concrete plaza apron directly around the building. */}
       <mesh
         position={[groundCenterX, -0.045, groundCenterZ]}
@@ -329,6 +332,7 @@ export function SceneAtmosphere({
         />
       ))}
 
+      </>}
       {/* Drifting dust motes over the office interior. */}
       <DustMotes
         centerX={groundCenterX}

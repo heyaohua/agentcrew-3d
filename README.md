@@ -1,354 +1,128 @@
-# Hermes3D — A 3D Workspace for AI Agents
+# AgentCrew 3D
 
-<p align="center">
-    <img src="assets/branding/hermes3d-hero.png" alt="Hermes3D" width="700">
-</p>
+**把终端里的 AI Agent，变成办公室里的伙伴。**
 
-<p align="center">
-  <strong>AN OFFICE FOR YOUR AI TEAM!</strong>
-</p>
+AgentCrew 3D 是基于 [Hermes3D](https://github.com/iamlukethedev/Hermes3D) 二次开发的本地只读观察室：工作中的 Agent 坐在电脑前，空闲的伙伴去共享沙发、茶水间和桌游区；需要你确认时，大屏提醒你回到终端处理。
 
-<p align="center">
-  <a href="https://github.com/iamlukethedev/Hermes3D/actions/workflows/docker-publish.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/iamlukethedev/Hermes3D/docker-publish.yml?branch=main&style=for-the-badge" alt="CI status"></a>
-  <a href="https://github.com/iamlukethedev/Hermes3D/releases"><img src="https://img.shields.io/github/v/release/iamlukethedev/Hermes3D?include_prereleases&style=for-the-badge" alt="GitHub release"></a>
-  <a href="https://x.com/iamlukethedev"><img src="https://img.shields.io/badge/Follow-%40iamlukethedev-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow on X"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
-</p>
+![AgentCrew 3D 办公室演示](docs/images/agentcrew-office-demo.png)
 
-**Hermes3D** is a _3D virtual office for AI agents_ you run on your own infrastructure.
-Instead of watching automation through dashboards and logs, you walk through a live 3D office where your agents collaborate, review code, run standups, ship pull requests, and execute tasks side by side. The Gateway is just the control plane — the product is the office.
+*截图使用隔离模拟数据演示工作、休息与等待状态，不包含真实会话。*
 
-If you want a personal, self-hosted workspace that turns your AI workforce into something you can actually _see_, this is it.
+[快速开始](#快速开始) · [Hook 接入](docs/integrations/local-observer.md) · [版本记录](docs/releases.md) · [来源与许可证](#来源与许可证)
 
-Supported runtimes include: Hermes through the bundled gateway adapter, a direct HTTP `custom` runtime provider for orchestrator-backed stacks, and a built-in demo gateway for office exploration without a real agent framework.
+> 开发预览 `0.1.0-dev.4`。办公室动作是状态的拟人化表现，不表示 Agent 的真实身体活动、内部思考或绩效。
 
-[Repository](https://github.com/iamlukethedev/Hermes3D) · [Vision](VISION.md) · [Architecture](ARCHITECTURE.md) · [Tutorial](TUTORIAL.md) · [Getting Started](#quick-start) · [Runtime Profiles](docs/runtime-profiles.md) · [Multi-Agent Beta](docs/multi-agent-beta.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+## 能看到什么
 
-> **Unofficial project.** Hermes3D is an independent, community-driven frontend. It is not affiliated with, endorsed by, or maintained by the teams behind the agent backends it connects to.
+- **工作与休息**：规整的独立工位、亮屏电脑，以及共享沙发、茶水台和实体桌游；休息区没有电脑。
+- **真实状态提醒**：工作、等待处理、回合结束、错误／中断、状态未知分别展示。没有新事件不等于任务完成。
+- **多工具与子 Agent**：接收 Codex、Claude Code、Kimi Code 支持的 Hook 事件；有可靠身份与生命周期证据时，单独显示子 Agent 和父子关系。
+- **办公室生活感**：打字、查看屏幕、举杯、看棋等小动作，可关闭，并尊重系统减少动态偏好。
+- **近距离看伙伴**：全景、工作区、休息区、员工近景；手动拖动后保持自由视角。短编号、详细名牌和员工档案帮助识别伙伴。
+- **3D / 2D**：可切换低负担的像素办公室；新增近景镜头仅用于 3D。
+- **局域网大屏**：可选择无口令、仅开放观察功能的局域网模式。
 
-Built and maintained by **LukeTheDev**. Follow on X: [@iamlukethedev](https://x.com/iamlukethedev).
+## 观察室的边界
 
-## What you can do with Hermes3D
+`/observe` 不连接模型、不派发任务、不回答问题、不代替你批准操作。需要确认或继续时，请回到对应终端。
 
-- **Watch your AI agents work in real time** inside a shared 3D office.
-- **Switch to the 2D pixel office** — a Gather-style pixel-art view of the same live agents for low-power machines (Settings → Office renderer, or the `2D` button in the office toolbar).
-- **Run standups** with agents connected to GitHub and Jira.
-- **Review pull requests** from inside the office.
-- **Monitor QA pipelines** and logs without leaving the workspace.
-- **Train agents in the gym** to develop new skills.
-- **Reset sessions and clean context** with the janitor system.
+界面只展示状态元数据，例如工具名称、会话／子 Agent ID、项目路径、事件类型和时间；不展示提示词、命令参数、工具输出或完整对话。Codex 兼容校正会在本机有界读取**已知会话**文件尾部，只提取白名单生命周期元数据，不保存或传输正文。
 
-## What Hermes3D Is
+**原 Hermes3D Studio / Gateway 功能仍保留在代码中，具有独立的交互和权限范围。** “只读”描述的是观察模式，并非整个上游 Studio。`--observe-public` 会阻止远程访问 Studio、其他 API、控制请求及 WebSocket。
 
-Hermes3D is the visualization and interaction layer.
+## 快速开始
 
-Today it can sit on top of:
+需要 Node.js 20+、npm 10+。安装 Hook 另需 Python 3.11+，无需额外 Python 包。观察模式不需要 Hermes 后端、模型 API Key、数据库或 Docker。
 
-- Hermes through the bundled WebSocket gateway adapter
-- a direct HTTP `custom` runtime provider for orchestrator-backed stacks
-- a built-in demo gateway for office exploration without a real agent framework
-
-In practical terms, this app gives you:
-
-- a live `/office` retro-office environment where agents appear as workers moving through a shared 3D world
-- an `/office/builder` surface for editing and publishing office layouts
-- a gateway-first architecture that keeps runtime state in the connected backend while Studio stores local UI preferences
-- a backend-neutral runtime seam inside Studio so additional providers can be integrated without rewriting the whole UI
-
-This repository does not build the upstream runtimes themselves. It is the frontend, Studio, and adapter/proxy layer that connects to a runtime speaking the Hermes3D gateway protocol.
-
-## Why It Exists
-
-AI systems are becoming more capable, but their work is still usually hidden behind logs, terminal output, and dashboards.
-
-Hermes3D exists to make agent systems visible:
-
-- inspect what agents are doing in real time
-- monitor runs, approvals, history, and activity from one place
-- interact with agents through chat and immersive UI surfaces
-- move toward a world where AI systems are understandable through space, motion, and presence
-
-For the broader direction of the project, see [`VISION.md`](VISION.md).
-
-## What Exists Today
-
-The current app already includes a substantial Hermes3D surface:
-
-- Fleet management and agent chat with runtime updates streamed from the gateway.
-- Agent creation, settings, session controls, approvals, and gateway-backed configuration editing.
-- A 3D retro office with desks, rooms, navigation, animations, and event-driven activity cues.
-- Immersive operational spaces for standups, GitHub review flows, analytics, and system monitoring.
-- Local Studio persistence for gateway connection details, focused-agent preferences, desk assignments, office state, and related UI settings.
-- A custom same-origin WebSocket proxy so the browser talks to Studio, and Studio talks to the upstream gateway.
-
-## Quick Start
-
-Requirements:
-
-- Node.js 20+ recommended.
-- npm 10+ recommended.
-- One of:
-  - a running Hermes API server plus the bundled gateway adapter
-  - the built-in demo gateway for local exploration
-
-Prerequisite:
-
-- Hermes3D does not install or build Hermes for you.
-- Before starting Hermes3D against a real backend, make sure your chosen runtime is already running and that you know the gateway URL and token Studio should use.
-- For a no-framework local office demo, run the bundled demo gateway instead.
-- If you need a full cross-machine setup guide (Hermes + Tailscale + Hermes3D), follow [`TUTORIAL.md`](TUTORIAL.md).
-- To connect to a remote `hermes-agent` backend with no adapter process, follow [`docs/hermes-agent-tailscale.md`](docs/hermes-agent-tailscale.md).
-- To make the office react to chats you have elsewhere (desktop app, TUI, CLI), install the optional bridge plugin in [`docs/office-conversation-bridge.md`](docs/office-conversation-bridge.md).
-
-Run from source:
-
-```bash
-git clone <your-public-repo-url> hermes3d
-cd hermes3d
-npm install
-cp .env.example .env
-npm run dev
+```sh
+git clone https://github.com/heyaohua/agentcrew-3d.git
+cd agentcrew-3d
+npm ci
+npm run observe
 ```
 
-Then open `http://localhost:3000` and configure the gateway URL and token in Studio.
-Studio now also persists the selected backend mode (`Hermes`, `Demo`, `Local`, `Hermes3D`, or `Custom`) and
-shows the active backend reported by the connected gateway.
+打开 **[http://127.0.0.1:3000/observe](http://127.0.0.1:3000/observe)**。初次没有会话是正常现象，需要安装 Hook 并收到工具事件。开发服务器的首次页面编译可能需要等待。
 
-### Runtime profiles
+在另一个终端，为需要观察的工具安装 Hook：
 
-If you are integrating an orchestrator-backed runtime through the direct
-HTTP runtime seam, start your runtime first, then start Hermes3D:
-
-```bash
-npm run dev
+```sh
+python3 scripts/observer-hooks.py install --tool codex
+python3 scripts/observer-hooks.py install --tool claude
+python3 scripts/observer-hooks.py install --tool kimi
 ```
 
-Then open `http://localhost:3000`, choose `Local runtime`, `Hermes3D runtime`,
-or `Custom backend`, and point the upstream URL at your runtime boundary.
-Typical examples:
+只安装你使用的工具即可。安装器备份现有配置并追加自己的 Hook，不覆盖其他 Hook。已启动的 Agent 可能需要重新加载配置或重启；Codex 还可能要求在其 Hook 管理界面审阅信任。**查看页面、升级前端或重启观察服务本身，不要求重启 Agent。**
 
-```text
-http://127.0.0.1:7770
+脚本路径会写入 Hook 配置，移动项目后需重新安装。卸载、状态含义、兼容限制见 [完整接入说明](docs/integrations/local-observer.md)。
+
+### 生产方式运行
+
+```sh
+npm run build -- --webpack
+npm run start -- --observe
 ```
 
-```text
-http://localhost:3000/api/runtime/custom
+同样打开 `http://127.0.0.1:3000/observe`。构建使用 Google Fonts，需要网络访问。可通过 `HERMES_DIST_DIR` 将新版本构建到独立目录，验证后再切换服务，避免构建时覆盖正在使用的静态资源。
+
+### 局域网大屏
+
+先完成生产构建，再运行：
+
+```sh
+HOST=0.0.0.0 PORT=5297 npm run start -- --observe --observe-public
 ```
 
-Current direct-runtime expectations:
+- 本机固定入口：`http://127.0.0.1:5297/observe`。
+- 同一局域网其他设备：`http://<运行服务的电脑当前局域网IP>:5297/observe`。
+- 换网络后 IP 可能改变。本机收藏 `127.0.0.1` 即可避免这个问题。
+- 此模式无查看口令；能连接端口的人可以看到状态和项目路径。适用于可信局域网，不要直接映射到公网。
+- Hook 事件仍只能通过本机回环地址和独立令牌提交；远程查看者不能控制 Agent。
 
-- `GET /health`
-- `GET /state`
-- `GET /registry`
-- `POST /v1/chat/completions`
+这些环境变量示例适用于 macOS / Linux shell。Windows 可在 PowerShell 中先设置对应的 `$env:HOST`、`$env:PORT`。
 
-The browser does not call that runtime directly. Hermes3D proxies the
-`custom` provider through its own same-origin route at
-`/api/runtime/custom`, which avoids browser-side CORS problems and keeps
-the provider transport separate from the Hermes gateway path.
+### 数据存在哪里
 
-### Hermes adapter
+为兼容已有安装，默认仍使用 `~/.hermes3d-observer`。可用 `OBSERVER_STATE_DIR` 指定目录；安装 Hook 时也须通过 `--state-dir` 指向同一目录。状态文件、接收令牌、Hook 备份和 `.env` 都属于本机私有文件，不要提交到 GitHub。
 
-Hermes is the default backend. It is reached through the bundled gateway
-adapter, which speaks the Hermes3D gateway WebSocket protocol on one side
-and the Hermes HTTP API (`http://localhost:8642` by default) on the other:
+## 支持范围与限制
 
-```bash
-npm run hermes-adapter
-npm run dev
+| 工具 | 观察方式 | 注意事项 |
+| --- | --- | --- |
+| Codex | Hook + 已知会话的本机生命周期校正 | 需要受支持的 Hook 版本及信任配置；旧进程可能缓存旧 Hook |
+| Claude Code | 会话、工具、等待及子 Agent Hook | 依赖实际产生的事件及子 Agent 标识 |
+| Kimi Code | 已支持的会话 Hook | 不假定所有版本均提供相同子 Agent 生命周期事件 |
+
+未知／失联记录只保留最后状态，不虚构工作或休息人物。Stop 表示一轮结束，不等于项目成功或验收通过。主 Agent 和子 Agent 分开计数，子 Agent 的活动不会冒充主 Agent 正在执行。
+
+当前验证包含状态／接收器／Hook 辅助程序测试、隔离模拟场景、可见浏览器和本机局域网访问。**模拟事件测试不等于三个工具全部版本的真实审批闭环验证**；实体手机和长时间运行也不是已完成的兼容承诺。具体范围见 [版本记录](docs/releases.md)。
+
+## 开发与验证
+
+```sh
+npm run typecheck
+npm run test:observer
+python3 -m unittest discover -s tests/observer -p 'test_*.py'
+npx vitest run tests/unit/observer*.test.ts
+npm run build -- --webpack
 ```
 
-See [`docs/hermes-gateway.md`](docs/hermes-gateway.md) for setup details and current scope.
+`npm run lint` 和完整 `npm run test -- --run` 可检查上游全部功能；历史完整套件存在已记录失败，不以局部测试通过代替全项目通过。
 
-For a local gateway on the same machine, the usual upstream URL is:
+- [贡献说明](CONTRIBUTING.md)
+- [安全与隐私](SECURITY.md)
+- [上游 Hermes3D README](README.hermes3d.md)：原 Studio、运行时、Gateway 和演示功能
+- [上游架构文档](ARCHITECTURE.md)：不代表观察模式需要部署对应后端
 
-```text
-ws://localhost:18789
-```
+Docker 发布工作流保留为手动触发，推送源码不会自动发布容器镜像。容器中的回环地址与宿主机不同，当前终端 Hook 推荐直接在本机运行观察器。
 
-In the connect screen, choose `Hermes backend`, then connect.
+## 来源与许可证
 
-### Demo mode
+AgentCrew 3D 是独立维护的二次开发项目，不是 Hermes3D 官方更名，也不代表原作者或各 Agent 工具厂商。
 
-If you only want to see the office and agent interactions without installing Hermes:
+- **原项目**：[iamlukethedev/Hermes3D](https://github.com/iamlukethedev/Hermes3D)
+- **原作者**：Luke The Dev（[@iamlukethedev](https://github.com/iamlukethedev)）
+- **上游基线**：[`beb7629`](https://github.com/iamlukethedev/Hermes3D/commit/beb7629)
+- **二次开发维护**：[@heyaohua](https://github.com/heyaohua)
+- **许可证**：[MIT](LICENSE)，原始 `Copyright (c) 2026 Luke The Dev` 和许可文本完整保留；本项目修改同样采用 MIT。
 
-```bash
-npm run demo-gateway
-npm run dev
-```
-
-Then connect Studio to:
-
-```text
-ws://localhost:18789
-```
-
-This starts a mock local gateway with demo agents, streaming chat, session previews, and office presence.
-In the connect screen, choose `Demo backend`, then connect.
-
-## How It Connects
-
-Hermes3D uses two separate network hops:
-
-1. Browser -> Studio over HTTP and a same-origin WebSocket at `/api/gateway/ws`.
-2. Studio -> the gateway over a second WebSocket opened by the Studio server.
-
-That means `ws://localhost:18789` always refers to the gateway reachable from the Studio host, not necessarily from the browser device.
-
-This design keeps gateway settings persisted on the Studio host and lets Studio open the upstream connection server-side. The current UI still loads the configured upstream URL/token into browser memory at runtime, so treat the browser as part of the active trust boundary.
-
-## Common Setups
-
-### Gateway local, Studio local
-
-1. Start Studio with `npm run dev`.
-2. Open `http://localhost:3000`.
-3. Use `ws://localhost:18789` plus your gateway token.
-
-### Gateway remote, Studio local
-
-Use any gateway URL your machine can reach.
-
-Recommended with Tailscale:
-
-1. On the gateway host, run `tailscale serve --yes --bg --https 443 http://127.0.0.1:18789`.
-2. In Studio, use `wss://<gateway-host>.ts.net`.
-
-Alternative with SSH:
-
-1. Run `ssh -L 18789:127.0.0.1:18789 user@<gateway-host>`.
-2. In Studio, use `ws://localhost:18789`.
-
-### Studio remote, Gateway remote
-
-1. Run Studio on the remote host.
-2. Expose Studio on a private network or over Tailscale.
-3. Set `STUDIO_ACCESS_TOKEN` if Studio binds to a public host.
-4. Configure the gateway URL and token inside Studio.
-
-### Studio on LAN or Tailscale for other devices
-
-1. Start Studio with `HOST=0.0.0.0` (or a specific LAN/Tailscale host).
-2. Set `STUDIO_ACCESS_TOKEN` before exposing Studio beyond localhost.
-3. Open Hermes3D from the LAN/Tailscale address instead of `localhost`.
-4. If you are connecting to a remote gateway, make sure that gateway accepts connections from the Studio host and that the token you configured is the one it expects.
-
-## Tech Stack
-
-- Next.js App Router, React, and TypeScript for the main web application.
-- A custom Node server for the Studio-side WebSocket proxy.
-- Three.js, React Three Fiber, and Drei for the 3D office experience.
-- Phaser for the 2D pixel office, office/viewer-builder workflows, and related interactive surfaces.
-- Vitest for unit tests and Playwright for end-to-end coverage.
-
-## Configuration
-
-Important runtime paths:
-
-- Hermes config: `~/.hermes/hermes.json`
-- Studio settings: `~/.hermes/hermes3d/settings.json`
-
-Common environment variables:
-
-- `HOST` and `PORT` control the Studio server bind address and port.
-- `STUDIO_ACCESS_TOKEN` protects Studio when binding to a public host.
-- `UPSTREAM_ALLOWLIST` restricts which upstream gateway hosts Studio may proxy to. Set this in production.
-- `CUSTOM_RUNTIME_ALLOWLIST` restricts which hosts `/api/runtime/custom` may fetch. If unset, it falls back to `UPSTREAM_ALLOWLIST`.
-- `NEXT_PUBLIC_GATEWAY_URL` provides the default upstream gateway URL when Studio settings are empty. **Note:** this is a build-time variable — changes require `npm run build` to take effect.
-- `HERMES3D_GATEWAY_URL` and `HERMES3D_GATEWAY_TOKEN` provide a runtime alternative to `NEXT_PUBLIC_GATEWAY_URL` that takes effect on server restart without a rebuild.
-- `HERMES3D_GATEWAY_ADAPTER_TYPE` can pair with `HERMES3D_GATEWAY_URL` to mark those runtime defaults as `hermes`, `demo`, `local`, `hermes3d`, or `custom`.
-- If `HERMES3D_GATEWAY_URL` is not set, Studio can still surface local Hermes or demo adapter defaults from `HERMES_ADAPTER_PORT` / `DEMO_ADAPTER_PORT`.
-- `HERMES_API_URL` points the gateway adapter at the Hermes HTTP API. It defaults to `http://localhost:8642`.
-- Hermes file defaults come from `~/.hermes/hermes.json` when present.
-- `HERMES_STATE_DIR` and `HERMES_CONFIG_PATH` override the default Hermes paths.
-- `HERMES_GATEWAY_SSH_TARGET`, `HERMES_GATEWAY_SSH_USER`, `HERMES_GATEWAY_SSH_PORT`, and `HERMES_GATEWAY_SSH_STRICT_HOST_KEY_CHECKING` support advanced gateway-host operations over SSH when needed.
-- `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, and `ELEVENLABS_MODEL_ID` enable voice reply integration.
-
-See [`.env.example`](.env.example) for the full local development template.
-
-## Scripts
-
-- `npm run dev` starts the Studio dev server.
-- `npm run hermes-adapter` starts the Hermes WebSocket adapter.
-- `npm run demo-gateway` starts the built-in mock gateway for demo mode.
-- `npm run build` builds the production Next.js app.
-- `npm run start` starts the production server.
-- `npm run lint` runs ESLint.
-- `npm run typecheck` runs TypeScript without emitting output.
-- `npm run test` runs unit tests with Vitest.
-- `npm run e2e` runs Playwright tests.
-- `npm run studio:setup` prepares common local Studio prerequisites.
-- `npm run smoke:dev-server` runs a basic dev-server smoke check.
-
-## Documentation
-
-- [`VISION.md`](VISION.md): project direction and long-term guardrails.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md): system boundaries, data flow, and major trade-offs.
-- [`TUTORIAL.md`](TUTORIAL.md): detailed step-by-step setup for Hermes + Tailscale + Hermes3D.
-- [`docs/hermes-agent-tailscale.md`](docs/hermes-agent-tailscale.md): connect to a remote `hermes-agent` over Tailscale with no adapter process.
-- [`docs/office-conversation-bridge.md`](docs/office-conversation-bridge.md): optional plugin that makes the office react to chats you have in the desktop app, TUI, or CLI.
-- [`docs/multi-agent-beta.md`](docs/multi-agent-beta.md): remote office beta setup, connection modes, and limitations.
-- [`docs/runtime-profiles.md`](docs/runtime-profiles.md): saved backend/runtime profiles and the current HTTP runtime seam.
-- [`CODE_DOCUMENTATION.md`](CODE_DOCUMENTATION.md): practical code map, extension points, and contributor onboarding order.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): local workflow, testing, and PR expectations.
-- [`SUPPORT.md`](SUPPORT.md): where to ask for help and how to route reports.
-- [`ROADMAP.md`](ROADMAP.md): near-term priorities and contributor-friendly work areas.
-- [`docs/pi-chat-streaming.md`](docs/pi-chat-streaming.md): gateway runtime streaming and transcript rendering.
-- [`docs/permissions-sandboxing.md`](docs/permissions-sandboxing.md): Studio permissions and gateway-side sandbox behavior.
-- [`docs/hermes-gateway.md`](docs/hermes-gateway.md): Hermes adapter setup, capabilities, and current limitations.
-
-## Current Limitations
-
-- The immersive retro office (`/office`) and the Phaser builder (`/office/builder`) are related but still separate stacks.
-- The app keeps gateway secrets out of browser persistent storage, but the current connection flow still loads the upstream URL/token into browser memory at runtime.
-- Voice transcription is not bundled. `/api/office/voice/transcribe` returns `501 Not Implemented`, so voice notes must be transcribed by an external provider before they reach the office.
-- Local Spotify auth for `SOUNDHERMES` currently stores an access token only. Refresh-token handling is not implemented yet, so local Spotify auth may need to be repeated after the token expires.
-
-## Troubleshooting
-
-If the UI loads but Connect fails, the problem is usually on the Studio -> Gateway side:
-
-- Confirm the upstream URL and token in Studio settings.
-- `EPROTO` or `wrong version number` usually means `wss://` was used against a non-TLS endpoint.
-- `INVALID_REQUEST` errors mentioning `minProtocol` or `maxProtocol` usually mean the gateway is too old for Hermes3D protocol v3. Update the gateway you are connecting to, run the bundled Hermes adapter, or run `npm run demo-gateway`.
-- `401 Studio access token required` usually means `STUDIO_ACCESS_TOKEN` is enabled and the request is missing the expected `studio_access` cookie.
-- If `/api/runtime/custom` returns a blocked-host error in production, set `CUSTOM_RUNTIME_ALLOWLIST` or include the runtime host in `UPSTREAM_ALLOWLIST`.
-- Helpful proxy error codes include `studio.gateway_url_missing`, `studio.gateway_token_missing`, `studio.upstream_error`, and `studio.upstream_closed`.
-
-Marketplace skill installs now use a gateway-native workspace flow and do not require enabling SSH on the user machine.
-
-### Spotify auth on localhost
-
-If you are testing the `SOUNDHERMES` jukebox locally and Spotify OAuth does not accept your `localhost` callback, use an `ngrok` callback bridge:
-
-1. Keep Hermes3D running locally on `http://localhost:3000`.
-2. Start `ngrok` for the local Studio server, for example `ngrok http 3000`.
-3. In the jukebox setup UI, paste your public `ngrok` URL into the `ngrok Public URL` field.
-4. In the Spotify developer dashboard, register `https://<your-ngrok-host>/spotify/callback` as the redirect URI.
-5. Complete Spotify sign-in from the jukebox panel.
-
-How it works:
-
-- The main Hermes3D app stays on `localhost`, so your normal local office state and agent state remain intact.
-- Spotify redirects to the `ngrok` callback URL.
-- The callback page passes the auth code back to the open local Hermes3D window.
-
-Current local limitation:
-
-- Because only the Spotify access token is stored right now, you may need to repeat the `ngrok` auth flow when that token expires during local development.
-
-If you use other advanced gateway-host operations over SSH:
-
-- macOS: enable `System Settings` -> `General` -> `Sharing` -> `Remote Login`, and make sure the target user is allowed.
-- Windows: enable the `OpenSSH Server` optional feature, start the `sshd` service, and allow it through the firewall.
-- Linux: make sure `sshd` is installed, running, and reachable from the Studio machine.
-
-For first-time SSH connections, Hermes3D uses `StrictHostKeyChecking=accept-new` by default so a new host key can be trusted automatically. If you need stricter behavior, set `HERMES_GATEWAY_SSH_STRICT_HOST_KEY_CHECKING=yes`, or set it to `no` only if you explicitly want to skip host key checks.
-
-## Contributing
-
-Keep pull requests focused, run `npm run lint`, `npm run typecheck`, and `npm run test` before opening a PR, and update docs when behavior or architecture changes.
-
-Shared editing expectations for this repository are described in [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md), including the boundary between Hermes3D and the backend it connects to, code placement conventions, office-stack distinctions, and documentation/test update expectations.
-
-Community expectations live in [`CODE_OF_CONDUCT.MD`](CODE_OF_CONDUCT.MD). Security reporting instructions live in [`SECURITY.md`](SECURITY.md).
+感谢 Hermes3D 提供 3D / 2D 办公室、人物与场景、Studio 及 Gateway 基础。AgentCrew 3D 在此基础上增加本地终端观察、状态可信度处理、共享休息区、生活动作与员工近景等功能。依赖与第三方素材仍适用各自许可证；来源说明见 [NOTICE](NOTICE.md)。

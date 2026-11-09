@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { RunningAvatarLoader } from "@/features/agents/components/RunningAvatarLoader";
 import { AgentStoreProvider } from "@/features/agents/state/store";
 import { OfficeScreen } from "@/features/office/screens/OfficeScreen";
@@ -35,6 +36,7 @@ export default function OfficePage() {
 
   return (
     <AgentStoreProvider>
+      <Link href="/observe" className="fixed bottom-3 right-3 z-[100] rounded border border-white/20 bg-black/80 px-3 py-2 text-xs text-white">终端观察室 ↗</Link>
       <Suspense fallback={<OfficeLoadingFallback />}>
         <OfficeScreen showHermesConsole={showHermesConsole} />
       </Suspense>

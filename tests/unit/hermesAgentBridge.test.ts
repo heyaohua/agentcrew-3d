@@ -241,7 +241,7 @@ describe("profiles as agents", () => {
   const backendProfiles = [
     {
       name: "default",
-      path: "/Users/lukeai1/.hermes",
+      path: "/Users/example/.hermes",
       is_default: true,
       model: "claude-haiku-4-5-20251001",
       description: "",
@@ -249,7 +249,7 @@ describe("profiles as agents", () => {
     },
     {
       name: "allan",
-      path: "/Users/lukeai1/.hermes/profiles/allan",
+      path: "/Users/example/.hermes/profiles/allan",
       is_default: false,
       model: "claude-haiku-4-5-20251001",
       description:
@@ -258,7 +258,7 @@ describe("profiles as agents", () => {
     },
     {
       name: "andrew",
-      path: "/Users/lukeai1/.hermes/profiles/andrew",
+      path: "/Users/example/.hermes/profiles/andrew",
       is_default: false,
       model: "claude-opus-4-8",
       description: "Andrew — senior full-stack software developer for Smartways.",

@@ -43,3 +43,16 @@ Please report issues related to:
 - In production, set `CUSTOM_RUNTIME_ALLOWLIST` if you use `/api/runtime/custom`. If unset, it falls back to `UPSTREAM_ALLOWLIST`.
 - Empty allowlists are intended for local development only.
 - If you enable `STUDIO_ACCESS_TOKEN`, you must also provision the `studio_access` cookie through your deployment/auth layer.
+
+## AgentCrew 3D local observer
+
+The read-only guarantee applies to `/observe`, not all inherited Studio routes.
+`--observe-public` restricts remote access to observer reads and display resources;
+Hook ingestion remains loopback-only and token-authenticated. Do not expose this
+unauthenticated viewing mode to the public Internet: project paths and session
+metadata are visible to clients that can reach it.
+
+Keep the observer state directory (by default `~/.hermes3d-observer`), Hook backup
+files and local `.env` files private. The Codex lifecycle fallback reads bounded
+local session tails to extract allowlisted lifecycle metadata; it does not store
+or transmit conversation bodies. See [observer setup](docs/integrations/local-observer.md).

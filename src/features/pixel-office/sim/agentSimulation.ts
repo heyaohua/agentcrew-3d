@@ -82,6 +82,9 @@ type InternalAgentState = PixelSimAgentState & {
   lastStationId: string | null;
   /** Janitor-only cursor into the wander station cycle. */
   wanderIndex: number;
+  restActivity?: "tea" | "game";
+  restUntil?: number;
+  observerFrozen?: boolean;
 };
 
 const hashString = (value: string): number => {
@@ -105,7 +108,7 @@ const mulberry32 = (seed: number): (() => number) => {
   };
 };
 
-export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
+export const createPixelSimulation = (map: PixelOfficeMap, previousState?: PixelSimState): PixelSimulation => {
   const navGrid = buildPixelNavGrid(map);
   const stationById = new Map<string, PixelStation>(
     map.stations.map((stationSlot) => [stationSlot.id, stationSlot]),
@@ -121,6 +124,8 @@ export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
     IDLE_STATION_KINDS.includes(stationSlot.kind),
   );
   const deskById = new Map(map.desks.map((deskSlot) => [deskSlot.id, deskSlot]));
+  const observerSeats = map.stations.filter(station => station.id.startsWith("rest-tea-") || station.id.startsWith("rest-game-"));
+  const observerQueue = map.stations.filter(station => station.id.startsWith("rest-queue-"));
   const spawnCenter = tileCenter(map.spawn.tx, map.spawn.ty);
 
   const state: {
@@ -162,6 +167,20 @@ export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
       if (other.id !== selfId && other.goalStationId === stationId) return true;
     }
     return false;
+  };
+
+  // A frozen actor retains both its reserved place and its physical footprint.
+  // Fresh workers release a reservation immediately, but nobody may sit on
+  // them until they have actually walked off that seat.
+  const isObserverStationOccupied = (station: PixelStation, selfId: string): boolean => {
+    const point = tileCenter(station.tx, station.ty);
+    return Object.values(state.agents).some(other => other.id !== selfId && (
+      other.goalStationId === station.id || Math.hypot(other.x - point.x, other.y - point.y) < PIXEL_TILE_SIZE * 0.55
+    ));
+  };
+  const pickObserverStation = (agent: InternalAgentState, pool: PixelStation[]) => {
+    return pool.filter(station => !isObserverStationOccupied(station, agent.id))
+      .sort((a,b) => distanceSq(agent,a)-distanceSq(agent,b))[0];
   };
 
   const distanceSq = (agent: InternalAgentState, stationSlot: PixelStation): number => {
@@ -278,6 +297,45 @@ export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
     input: PixelAgentInput,
     nowMs: number,
   ) => {
+    if (input.observation) {
+      const { seat, uncertain, state: observed } = input.observation;
+      agent.observerFrozen = uncertain;
+      if (uncertain) { holdPosition(agent); return; }
+      if (observed === "working") {
+        agent.goalKind = "desk";
+        agent.goalStationId = null;
+        agent.restUntil = undefined;
+        const desk = deskById.get(`desk-${seat}`);
+        if (desk) {
+          const target = tileCenter(desk.seatTx, desk.seatTy);
+          setTarget(agent, target.x, target.y, desk.facing);
+        } else holdPosition(agent);
+        return;
+      }
+      let station = agent.goalStationId ? stationById.get(agent.goalStationId) : undefined;
+      const atRestSeat = station && (station.id.startsWith("rest-tea-") || station.id.startsWith("rest-game-"));
+      if (!atRestSeat) {
+        station = pickObserverStation(agent, observerSeats) ??
+          (station?.id.startsWith("rest-queue-") ? station : pickObserverStation(agent, observerQueue));
+        agent.restUntil = undefined;
+      } else if (agent.arrived && station) {
+        if (agent.restUntil === undefined) agent.restUntil = nowMs + 18000;
+        else if (nowMs >= agent.restUntil) {
+          const wanted = station.id.startsWith("rest-tea-") ? "rest-game-" : "rest-tea-";
+          // Keep the current seat if the other activity is full. Never swap
+          // into an occupied seat, even when all 24 people want to switch.
+          station = pickObserverStation(agent, observerSeats.filter(candidate => candidate.id.startsWith(wanted))) ?? station;
+          agent.restUntil = nowMs + 18000;
+        }
+      }
+      agent.goalKind = "station";
+      agent.goalStationId = station?.id ?? null;
+      if (station) {
+        const target = tileCenter(station.tx, station.ty);
+        setTarget(agent, target.x, target.y, station.facing);
+      } else holdPosition(agent);
+      return;
+    }
     // Priority a: an active hold routes the agent to a matching station.
     if (input.hold) {
       if (agent.holdKind !== input.hold || agent.goalKind !== "station") {
@@ -399,6 +457,9 @@ export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
   };
 
   const activityFor = (agent: InternalAgentState): PixelAgentActivity => {
+    if (agent.observerFrozen) return "standing";
+    if (agent.arrived && agent.goalStationId?.startsWith("rest-tea-")) return "drinking_tea";
+    if (agent.arrived && agent.goalStationId?.startsWith("rest-game-")) return "playing_game";
     if (agent.goalKind === "dance") return "dancing";
     if (!agent.arrived && agent.path.length > 0) return "walking";
     if (!agent.arrived) return "standing";
@@ -483,6 +544,7 @@ export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
     cleaningActive: boolean;
   }): PixelAgentPose[] => {
     const stepMs = Math.min(Math.max(dtMs, 0), MAX_STEP_MS);
+    inputs = inputs.filter(input => input.observation?.state !== "closed");
 
     // Roster sync: drop absent agents and free their desks.
     const inputIds = new Set(inputs.map((input) => input.id));
@@ -499,12 +561,38 @@ export const createPixelSimulation = (map: PixelOfficeMap): PixelSimulation => {
     );
     for (const input of sortedInputs) {
       if (!state.agents[input.id]) {
-        state.agents[input.id] = createAgentState(input.id);
+        const agent = createAgentState(input.id);
+        const previous = previousState?.agents[input.id];
+        if (previous) {
+          agent.x = previous.x; agent.y = previous.y; agent.facing = previous.facing;
+          agent.goalStationId = previous.goalStationId;
+          agent.goalKind = previous.goalKind;
+          agent.restUntil = previous.pauseUntil || undefined;
+        } else if (input.observation) {
+          // First-seen uncertain sessions have no observed on-screen position
+          // to preserve. Give them a free lounge seat before freezing them;
+          // existing/restored actors above retain their exact previous position.
+          const initialSeat = input.observation.uncertain
+            ? pickObserverStation(agent, observerSeats)
+            : undefined;
+          const entry = initialSeat ?? observerQueue.find(station => !isObserverStationOccupied(station, input.id));
+          if (entry) {
+            const point = tileCenter(entry.tx, entry.ty);
+            agent.x = point.x; agent.y = point.y; agent.goalStationId = entry.id;
+            agent.facing = entry.facing;
+            agent.goalKind = "station";
+          }
+        }
+        state.agents[input.id] = agent;
       }
     }
 
     // Sticky desk assignment: first free desk in map order, agents by id.
     for (const input of sortedInputs) {
+      if (input.observation) {
+        state.deskByAgentId[input.id] = `desk-${input.observation.seat}`;
+        continue;
+      }
       if (input.status !== "working" && input.status !== "error") continue;
       if (state.deskByAgentId[input.id]) continue;
       const used = new Set(Object.values(state.deskByAgentId));

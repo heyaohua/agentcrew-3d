@@ -1,0 +1,1 @@
+export const MAX_VOICE_UPLOAD_BYTES = 20 * 1024 * 1024;

@@ -412,7 +412,7 @@ export const GatewayConnectScreen = ({
             </p>
           </div>
           <div className="rounded-md border border-border bg-muted/30 px-3 py-3">
-            <p className="text-xs font-medium text-foreground">Opening Hermes3D from another machine?</p>
+            <p className="text-xs font-medium text-foreground">Opening AgentCrew 3D from another machine?</p>
             <p className="mt-1 text-xs leading-snug text-muted-foreground">
               Start Studio with <span className="font-mono text-foreground">HOST=0.0.0.0</span> (or a
               specific LAN/Tailscale host) and set
