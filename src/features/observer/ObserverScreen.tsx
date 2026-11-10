@@ -66,14 +66,14 @@ export function ObserverScreen(){
       remoteOfficeEnabled={false} remoteOfficeSourceKind="presence_endpoint" remoteOfficeLabel="" remoteOfficePresenceUrl="" remoteOfficeGatewayUrl="" remoteOfficeTokenConfigured={false}
       voiceRepliesEnabled={false} voiceRepliesVoiceId={null} voiceRepliesSpeed={1} voiceRepliesLoaded />}
     {!online&&loaded?<div role="alert" className="observer-banner">观察服务未连接，画面中的状态可能过期。请确认以 <code>npm run observe</code> 启动。</div>:null}
-    {online&&snapshot.sessions.length===0?<div className="observer-empty"><div className="observer-eyebrow">等待第一条真实事件</div><h2>终端里的工作，会出现在这里</h2><p>接好 Hook 后，在 Codex、Claude Code 或 Kimi Code 中提交消息。</p><p>已打开的终端可能需要重新加载 Hook。这里不会自动接管会话。</p></div>:null}
-    <div className="observer-scene-note">观察模式 · 操作请回到终端{view.counts.unknown>0?` · ${view.counts.unknown} 个状态未知，暂不安排工作或休息`:""}</div>
+    {online&&snapshot.sessions.length===0?<div className="observer-empty"><div className="observer-eyebrow">等待第一条真实事件</div><h2>Agent 的工作，会出现在这里</h2><p>接好 Hook 或 DSH 插件后，在 Codex、Claude Code、Kimi Code 或 DSH 中提交消息。</p><p>已打开的工具可能需要重新加载接入配置。这里不会自动接管会话。</p></div>:null}
+    <div className="observer-scene-note">观察模式 · 操作请回到原工具{view.counts.unknown>0?` · ${view.counts.unknown} 个状态未知，暂不安排工作或休息`:""}</div>
    </section>
    <aside className="observer-sidebar" ref={sidebarRef}>
     <ObserverTeamLife sessions={allRows} working={working} resting={view.counts.resting} online={online} onSelect={setSelected}/>
     {detail?<section className="observer-detail"><div className="observer-card-top"><h3>员工档案</h3><button onClick={()=>setSelected(null)} aria-label="关闭会话详情">×</button></div><EmployeeBadge id={detail.id}/><p>{TOOL_NAMES[detail.tool]} · {detail.displayLabel}</p><code>{detail.project}</code><code>{detail.agentId?"上级":"会话"}：{detail.sessionId}</code>{detail.agentId?<code>子 Agent：{detail.agentId} · {detail.agentType}</code>:null}{detail.parentId?<button className="observer-parent-link" onClick={()=>setSelected(detail.parentId!)}>查看上级伙伴 ↗</button>:null}<h3>最近事件</h3><ol>{[...detail.events].reverse().map((e,i)=><li key={i}><time>{new Date(e.at).toLocaleTimeString("zh-CN")}</time> {e.event} {e.toolName}</li>)}</ol></section>:null}
     <div className="observer-sidebar-title"><h2>会话动态</h2><label><input type="checkbox" checked={hideEnded} onChange={e=>setHideEnded(e.target.checked)} /> 隐藏历史（{view.counts.history}）</label></div>
-    {view.attention.length>0?<div className="observer-attention" role="status"><strong>{view.attention.length} 个会话等待你处理</strong><p>在终端确认或回答后，大屏会随新事件更新。</p></div>:null}
+    {view.attention.length>0?<div className="observer-attention" role="status"><strong>{view.attention.length} 个会话等待你处理</strong><p>在原工具确认或回答后，大屏会随新事件更新。</p></div>:null}
     <div className="observer-list">
      {[...view.rows].sort((a,b)=>Number(b.state==="waiting")-Number(a.state==="waiting") || b.updatedAt-a.updatedAt).map(s=><button key={s.id} className={"observer-card "+(s.state==="waiting"&&!s.uncertain?"is-waiting ":"")+(selected===s.id?"is-selected":"")} onClick={()=>setSelected(selected===s.id?null:s.id)}>
       <div className="observer-card-top"><strong>{TOOL_NAMES[s.tool]}{s.agentId?" · 子 Agent":" · 主会话"}</strong><span className={"observer-badge state-"+(s.uncertain?"unknown":s.state)}>{s.displayLabel}</span></div>

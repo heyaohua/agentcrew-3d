@@ -1,5 +1,18 @@
 # AgentCrew 3D 开发预览
 
+## AgentCrew 3D 0.1.0-dev.5 — 2026-11-10
+
+新增 **DSH / DeepSeek Harness** 支持，沿用 Codex、Claude Code、Kimi Code 的接入方式及 Hermes3D 来源／MIT 许可证。
+
+- DSH 通过原生 Cordis 事件接入，以独立名称和颜色展示。工作、批准、提问、工具返回、回合结束／中断／错误分别处理；并发等待按 ID 独立解除。
+- 只在实时所有权得到确认时识别子 Agent。会话运行实例释放时退场；初始缺工作目录时可由后续原生目录事件补齐。不会回放历史对话或把应用进程存活当作会话在工作。
+- 新增保留原配置、备份和幂等安装／卸载脚本；仅上报状态白名单，短超时、有界队列、失败隔离和卸载清理。原生插件的命名导出保留依赖声明。
+- 安装与限制见 [DSH 接入说明](integrations/dsh-observer.md)。当前按桌面版 `0.2.1-rc.5` 事件契约适配，不宣称所有 DSH 版本兼容。
+
+验证：独立 QA 的 39 项 Node、10 项 Python 检查通过，含并发批准与提问、晚到目录、关闭身份、网络失败隔离和 Loader 导出形态。43 项观察界面／状态回归、TypeScript、修改范围 ESLint、Webpack 生产构建通过。可见 Chrome 隔离数据检查 DSH 工作、子 Agent、等待及 3D／2D 显示，无浏览器错误，截图已检查。原生契约来自已安装版本源码，插件 HTTP 集成使用合成事件和测试上下文，不等于 DSH 真实加载或真实审批闭环。
+
+独立产物 `.next-office-agentcrew-dev5-r2`，Build ID `zRAmG5vJbkTUQ8EXIi-gm`；同轮首个候选 `.next-office-agentcrew-dev5` 保留。本机看板服务已切换，可见 Chrome 核验生产页面与 3D／2D 切换无错误，本机经局域网 IP 访问返回 HTTP 200；dev.4 及更早产物保留，回退只切换 `HERMES_DIST_DIR` 并重启观察服务；先卸载 DSH 插件可避免向旧版接收器提交不支持的工具类型。DSH 配置已追加，实时加载和真实会话验证待确认。
+
 ## AgentCrew 3D 0.1.0-dev.4 — 2026-11-09
 
 首次以 AgentCrew 3D 名称整理公开源码。保持观察器、Hook 和上游协议兼容，界面标题、包名与项目元数据采用新名称。

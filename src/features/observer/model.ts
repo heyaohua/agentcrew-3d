@@ -3,14 +3,14 @@ export type ObserverSession = {
  source?:"codex-lifecycle";
  agentId?:string;agentType?:string;parentId?:string|null;activeChildren?:number;
  freshness?:"fresh"|"process"|"unknown"|"settled";processAlive?:boolean|null;silent?:boolean;
- id:string; tool:"codex"|"claude"|"kimi"; sessionId:string; project:string;
+ id:string; tool:"codex"|"claude"|"kimi"|"dsh"; sessionId:string; project:string;
  state:"ready"|"working"|"waiting"|"ended"|"interrupted"|"error"|"closed";
  reason:string; toolName:string; lastEvent:string; updatedAt:number; stale:boolean; restored:boolean;
  events:Array<{event:string;toolName:string;at:number}>;
 };
 export type ObserverSnapshot = {sessions:ObserverSession[];generatedAt:number;staleAfterMs:number;publicReadOnly?:boolean};
-export const TOOL_NAMES = {codex:"Codex",claude:"Claude Code",kimi:"Kimi Code"};
-const COLORS = {codex:"#62d6b6",claude:"#e7a27c",kimi:"#99a7ff"};
+export const TOOL_NAMES = {codex:"Codex",claude:"Claude Code",kimi:"Kimi Code",dsh:"DSH"};
+const COLORS = {codex:"#62d6b6",claude:"#e7a27c",kimi:"#99a7ff",dsh:"#6aa9f8"};
 const LABELS = {ready:"已就绪",working:"正在工作",waiting:"等待你确认",ended:"本轮已结束",interrupted:"已中断",error:"报告错误",closed:"会话已关闭"};
 export function buildObserverView(sessions:ObserverSession[],options:{online:boolean;now:number;staleAfterMs:number;hideEnded:boolean;seatById?:Map<string,number>}){
  const seats=options.seatById ?? new Map<string,number>();

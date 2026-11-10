@@ -47,3 +47,12 @@ it('does not allocate empty workstations for unknown or hidden historical rows',
  const v=buildObserverView([...old,{...base,id:'unknown',stale:true},base],{online:true,now:1100,staleAfterMs:120000,hideEnded:true});
  expect(v.agents).toHaveLength(1);expect(v.agents[0].observation?.seat).toBe(0);expect(v.counts.history).toBe(20);
 });
+
+it('shows DSH with its own name and preserves working, waiting and child roles',()=>{
+ const dsh={...base,tool:'dsh' as const};
+ const v=buildObserverView([dsh,{...dsh,id:'dsh-child',agentId:'child',agentType:'DSH 子 Agent',parentId:dsh.id,state:'waiting' as const,reason:'question'}],{online:true,now:1100,staleAfterMs:120000,hideEnded:false});
+ expect(v.agents.find(a=>a.id===dsh.id)?.name).toBe('DSH');
+ expect(v.agents.find(a=>a.id===dsh.id)?.status).toBe('working');
+ expect(v.attention[0].label).toBe('等待你回答');
+ expect(v.counts.subagents).toBe(1);expect(v.counts.working).toBe(1);
+});

@@ -10,13 +10,13 @@ AgentCrew 3D 是基于 [Hermes3D](https://github.com/iamlukethedev/Hermes3D) 二
 
 [快速开始](#快速开始) · [Hook 接入](docs/integrations/local-observer.md) · [版本记录](docs/releases.md) · [来源与许可证](#来源与许可证)
 
-> 开发预览 `0.1.0-dev.4`。办公室动作是状态的拟人化表现，不表示 Agent 的真实身体活动、内部思考或绩效。
+> 开发预览 `0.1.0-dev.5`。办公室动作是状态的拟人化表现，不表示 Agent 的真实身体活动、内部思考或绩效。
 
 ## 能看到什么
 
 - **工作与休息**：规整的独立工位、亮屏电脑，以及共享沙发、茶水台和实体桌游；休息区没有电脑。
 - **真实状态提醒**：工作、等待处理、回合结束、错误／中断、状态未知分别展示。没有新事件不等于任务完成。
-- **多工具与子 Agent**：接收 Codex、Claude Code、Kimi Code 支持的 Hook 事件；有可靠身份与生命周期证据时，单独显示子 Agent 和父子关系。
+- **多工具与子 Agent**：接收 Codex、Claude Code、Kimi Code 的 Hook 和 DSH 的原生插件事件；有可靠身份与生命周期证据时，单独显示子 Agent 和父子关系。
 - **办公室生活感**：打字、查看屏幕、举杯、看棋等小动作，可关闭，并尊重系统减少动态偏好。
 - **近距离看伙伴**：全景、工作区、休息区、员工近景；手动拖动后保持自由视角。短编号、详细名牌和员工档案帮助识别伙伴。
 - **3D / 2D**：可切换低负担的像素办公室；新增近景镜头仅用于 3D。
@@ -24,7 +24,7 @@ AgentCrew 3D 是基于 [Hermes3D](https://github.com/iamlukethedev/Hermes3D) 二
 
 ## 观察室的边界
 
-`/observe` 不连接模型、不派发任务、不回答问题、不代替你批准操作。需要确认或继续时，请回到对应终端。
+`/observe` 不连接模型、不派发任务、不回答问题、不代替你批准操作。需要确认或继续时，请回到对应终端或 DSH 界面。
 
 界面只展示状态元数据，例如工具名称、会话／子 Agent ID、项目路径、事件类型和时间；不展示提示词、命令参数、工具输出或完整对话。Codex 兼容校正会在本机有界读取**已知会话**文件尾部，只提取白名单生命周期元数据，不保存或传输正文。
 
@@ -49,7 +49,11 @@ npm run observe
 python3 scripts/observer-hooks.py install --tool codex
 python3 scripts/observer-hooks.py install --tool claude
 python3 scripts/observer-hooks.py install --tool kimi
+# DeepSeek Harness 桌面版使用原生只读插件
+python3 scripts/dsh-observer.py install --profile desktop
 ```
+
+DSH 插件监听原生回合、工具、批准和子 Agent 事件，不扫描历史对话。配置热加载与版本限制见 [DSH 接入说明](docs/integrations/dsh-observer.md)。
 
 只安装你使用的工具即可。安装器备份现有配置并追加自己的 Hook，不覆盖其他 Hook。已启动的 Agent 可能需要重新加载配置或重启；Codex 还可能要求在其 Hook 管理界面审阅信任。**查看页面、升级前端或重启观察服务本身，不要求重启 Agent。**
 
@@ -91,10 +95,11 @@ HOST=0.0.0.0 PORT=5297 npm run start -- --observe --observe-public
 | Codex | Hook + 已知会话的本机生命周期校正 | 需要受支持的 Hook 版本及信任配置；旧进程可能缓存旧 Hook |
 | Claude Code | 会话、工具、等待及子 Agent Hook | 依赖实际产生的事件及子 Agent 标识 |
 | Kimi Code | 已支持的会话 Hook | 不假定所有版本均提供相同子 Agent 生命周期事件 |
+| DSH / DeepSeek Harness | 原生 Cordis 只读插件 | 按桌面版 `0.2.1-rc.5` 事件契约适配；需加载插件并产生新事件，不回放历史 |
 
 未知／失联记录只保留最后状态，不虚构工作或休息人物。Stop 表示一轮结束，不等于项目成功或验收通过。主 Agent 和子 Agent 分开计数，子 Agent 的活动不会冒充主 Agent 正在执行。
 
-当前验证包含状态／接收器／Hook 辅助程序测试、隔离模拟场景、可见浏览器和本机局域网访问。**模拟事件测试不等于三个工具全部版本的真实审批闭环验证**；实体手机和长时间运行也不是已完成的兼容承诺。具体范围见 [版本记录](docs/releases.md)。
+当前验证包含状态／接收器／Hook 辅助程序测试、隔离模拟场景、可见浏览器和本机局域网访问。**模拟事件测试不等于所有工具全部版本的真实审批闭环验证**；实体手机和长时间运行也不是已完成的兼容承诺。具体范围见 [版本记录](docs/releases.md)。
 
 ## 开发与验证
 

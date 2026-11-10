@@ -42,7 +42,7 @@ export function sampleLifePose(agent:RenderAgent,enabled=true):LifePose{
 
 /** Only translate tool/event metadata; a shell invocation says nothing about test success. */
 export function describeObserverEvent(event:string,toolName=''){
- const events:Record<string,string>={SessionStart:'来到办公室',SubagentStart:'子 Agent 加入协作',SubagentStop:'子 Agent 本轮结束',Stop:'本轮告一段落',SessionEnd:'会话已关闭',UserPromptSubmit:'收到新任务',PermissionRequest:'等待终端确认',PostToolUseFailure:'工具报告错误',task_complete:'本轮告一段落',task_started:'开始新一轮'};
+ const events:Record<string,string>={SessionStart:'来到办公室',SubagentStart:'子 Agent 加入协作',SubagentStop:'子 Agent 本轮结束',Stop:'本轮告一段落',SessionEnd:'会话已关闭',UserPromptSubmit:'收到新任务',PermissionRequest:'等待你确认',PermissionResolved:'已处理批准请求',PostToolUseFailure:'工具报告错误',task_complete:'本轮告一段落',task_started:'开始新一轮'};
  if(Object.hasOwn(events,event))return events[event];
  const tools:Record<string,string>={Read:'读取文件',read_file:'读取文件',Write:'写入文件',Edit:'修改文件',apply_patch:'修改文件',Bash:'执行命令',Shell:'执行命令',exec_command:'执行命令',Grep:'搜索代码',Glob:'查找文件',WebSearch:'搜索资料',WebFetch:'读取网页',spawn_agent:'发起协作',Agent:'调用子 Agent',Task:'调用子 Agent'};
  const name=toolName.split(/[.:/]/).pop()??toolName;

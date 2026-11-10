@@ -105,3 +105,7 @@ npm run typecheck
 ```
 
 真实工具、隔离模拟、浏览器界面及人工验收分别记录。不要把手工构造的批准事件说成真实 CLI 审批闭环。版本范围见 [releases](../releases.md)，历史设计和失败记录保留在 [历史记录](local-observer-history.md)。
+
+## DSH / DeepSeek Harness
+
+DSH 使用独立的原生 Cordis 插件，安装、卸载及版本限制见 [DSH 接入说明](dsh-observer.md)。不要为 DSH 安装 Claude Hook 或复用其他工具身份。

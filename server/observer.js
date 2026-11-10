@@ -7,8 +7,8 @@ const {createLifecycleReader}=require("./observer-codex-lifecycle");
 const {probeProcess}=require("./observer-process");
 const SETTLED=new Set(["ended","interrupted","error","closed"]);
 const STALE_MS = 120000;
-const EVENTS = new Set(["SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PostToolUseFailure","PermissionRequest","Stop","StopFailure","Interrupt","SessionEnd","Elicitation","ElicitationResult","SubagentStart","SubagentStop"]);
-const TOOLS = new Set(["codex","claude","kimi"]);
+const EVENTS = new Set(["SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PostToolUseFailure","PermissionRequest","PermissionResolved","Stop","StopFailure","Interrupt","SessionEnd","Elicitation","ElicitationResult","SubagentStart","SubagentStop"]);
+const TOOLS = new Set(["codex","claude","kimi","dsh"]);
 function field(value, max, required=false) {
   if(value === undefined || value === null) { if(required) throw new Error("Missing field"); return ""; }
   if(typeof value !== "string" || value.length > max || /[\x00-\x1f\x7f]/.test(value)) throw new Error("Invalid field");
@@ -125,6 +125,7 @@ function createObserver({stateDir=process.env.OBSERVER_STATE_DIR || path.join(os
       case "SessionStart": state="ready";reason="";pending=[];break;
       case "SubagentStart":
       case "UserPromptSubmit":state="working";reason="";pending=[];break;
+      case "PermissionResolved":
       case "PostToolUse":resolveTool();state="working";reason="";break;
       case "ElicitationResult":pending=pending.filter(p=>p.reason!=="question");state="working";reason="";break;
       case "PreToolUse":

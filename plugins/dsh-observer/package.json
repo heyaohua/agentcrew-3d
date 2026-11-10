@@ -1,0 +1,9 @@
+{
+  "name": "agentcrew-dsh-observer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "license": "MIT",
+  "description": "Read-only DeepSeek Harness session metadata bridge for AgentCrew 3D"
+}
